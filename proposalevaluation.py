@@ -1,10 +1,9 @@
 import streamlit as st
-import fitz  # PyMuPDF for handling PDFs
+import fitz
 import pandas as pd
 from fpdf import FPDF
 import google.generativeai as genai
 
-# Initialize Google Gemini with API Key from Streamlit Secrets
 genai.configure(api_key=st.secrets["google_gen_ai"]["api_key"])
 
 def read_pdf(uploaded_file):
@@ -23,12 +22,10 @@ def evaluate_with_gemini(proposal_text, sections):
     total_scored_points = 0
 
     for section in sections:
-        message = f"Please provide a detailed evaluation and suggestions for improvement for the section '{section['name']}': {proposal_text[:2000]}"
+        message = f"Please evaluate the section '{section['name']}' for its effectiveness, clarity, and accuracy in the proposal: {proposal_text[:2000]}"
         response = chat.send_message(message)
         evaluation = response.text.strip()
-        # Simple scoring logic based on content analysis
-        # Here we assume scoring based on some criteria you define; this is a placeholder:
-        score = min(len(evaluation.split()) / 10, section['points'])
+        score = min(len(evaluation.split()) * (section['points'] / total_possible_points), section['points'])
         total_scored_points += score
         responses[section['name']] = {
             'evaluation': evaluation,
@@ -55,14 +52,17 @@ def create_pdf(report_data, total_score, total_possible):
 def main():
     st.title("Proposal Evaluation App")
     expertise = st.text_input("Enter your field of expertise", value="technology")
-    st.write(f"You're a {expertise} expert, known for two decades of meticulous study, review, and evaluation of {expertise} projects and proposals.")
-    num_sections = st.number_input("How many sections does your proposal have?", min_value=0, max_value=10, step=1)
+
+    st.write(f"You're a {expertise} expert, known for two decades of meticulous study, review, and evaluation of projects and proposals.")
+    num_sections = st.number_input("How many sections does your proposal have?", min_value=1, max_value=10, step=1)
     sections = []
+
     for i in range(int(num_sections)):
         with st.expander(f"Section {i + 1} Details"):
             section_name = st.text_input(f"Name of section {i + 1}", key=f"name_{i}")
-            section_points = st.number_input(f"Points for section {i + 1}", min_value=0, max_value=100, step=1, key=f"points_{i}")
+            section_points = st.number_input(f"Percentage Points for section {i + 1}", min_value=0, max_value=100, step=1, key=f"points_{i}")
             sections.append({'name': section_name, 'points': section_points})
+
     uploaded_file = st.file_uploader("Upload your proposal PDF", type=["pdf"])
     if uploaded_file is not None:
         proposal_text = read_pdf(uploaded_file)
@@ -76,7 +76,7 @@ def main():
                 st.markdown(f"### {section}")
                 st.write("Evaluation:", data['evaluation'])
                 st.write("Score:", f"{data['score']}/{data['max_points']}")
-            st.markdown(f"### Total Score")
+            st.markdown("### Total Score")
             st.write("Score:", f"{total_score}/{total_possible}")
 
             with open("evaluation_report.pdf", "rb") as file:
