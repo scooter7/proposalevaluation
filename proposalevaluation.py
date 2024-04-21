@@ -4,28 +4,27 @@ import pandas as pd
 import openai
 
 def read_pdf(uploaded_file):
-    # Convert Streamlit UploadedFile to bytes
     file_stream = uploaded_file.read()
-    # Open the PDF with PyMuPDF using the bytes
     doc = fitz.open("pdf", file_stream)
     text = ""
     for page in doc:
         text += page.get_text()
     return text
 
-def evaluate_with_openai(proposal_text, sections):
+def evaluate_with_openai(proposal_text, sections, api_key):
+    openai.api_key = api_key
     responses = {}
     for section in sections:
-        # Use the new OpenAI API syntax for calling the model
-        response = openai.ChatCompletion.create(
-            model="gpt-4",  # Ensure you use the correct model ID, such as "text-davinci-004"
-            messages=[
-                {"role": "system", "content": "You are a sophisticated AI trained to evaluate proposals."},
-                {"role": "user", "content": f"Provide a detailed evaluation and suggestions for the section '{section['name']}' in the following text: {proposal_text[:4000]}"}
-            ]
+        prompt = f"Please provide a detailed evaluation and suggestions for improvement for the following section '{section['name']}':\n{proposal_text[:2000]}"
+        response = openai.Completion.create(
+            model="text-davinci-004",
+            prompt=prompt,
+            max_tokens=1024,
+            temperature=0.5
         )
+        evaluation_text = response.choices[0].text.strip()
         responses[section['name']] = {
-            'evaluation': response['choices'][0]['message']['content'],
+            'evaluation': evaluation_text,
             'max_points': section['points']
         }
     return responses
@@ -45,8 +44,7 @@ def main():
     if uploaded_file is not None:
         proposal_text = read_pdf(uploaded_file)
         if st.button("Evaluate Proposal"):
-            openai.api_key = st.secrets["openai"]["api_key"]
-            scores = evaluate_with_openai(proposal_text, sections)
+            scores = evaluate_with_openai(proposal_text, sections, st.secrets["openai"]["api_key"])
             df_scores = pd.DataFrame.from_dict(scores, orient='index', columns=['evaluation', 'max_points'])
             st.table(df_scores)
             st.subheader("Detailed Feedback and Suggestions")
