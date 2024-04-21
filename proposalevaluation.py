@@ -36,9 +36,8 @@ def evaluate_with_gemini(proposal_text, sections):
             'max_points': section['points']
         }
 
-    responses['total_score'] = total_scored_points
-    responses['total_possible'] = total_possible_points
-    return responses
+    totals = {'total_score': total_scored_points, 'total_possible': total_possible_points}
+    return responses, totals
 
 def create_pdf(report_data):
     pdf = FPDF()
@@ -70,18 +69,17 @@ def main():
     if uploaded_file is not None:
         proposal_text = read_pdf(uploaded_file)
         if st.button("Evaluate Proposal"):
-            scores = evaluate_with_gemini(proposal_text, sections)
-            df_scores = pd.DataFrame.from_dict(scores, orient='index', columns=['evaluation', 'score', 'max_points']).drop(['total_score', 'total_possible'], errors='ignore')
+            scores, totals = evaluate_with_gemini(proposal_text, sections)
+            df_scores = pd.DataFrame.from_dict(scores, orient='index', columns=['evaluation', 'score', 'max_points'])
             st.table(df_scores)
             create_pdf(scores)
             st.subheader("Detailed Feedback and Suggestions")
             for section, data in scores.items():
-                if section not in ['total_score', 'total_possible']:
-                    st.markdown(f"### {section}")
-                    st.write("Evaluation:", data['evaluation'])
-                    st.write("Score:", f"{data['score']}/{data['max_points']}")
+                st.markdown(f"### {section}")
+                st.write("Evaluation:", data['evaluation'])
+                st.write("Score:", f"{data['score']}/{data['max_points']}")
             st.markdown(f"### Total Score")
-            st.write("Score:", f"{scores['total_score']}/{scores['total_possible']}")
+            st.write("Score:", f"{totals['total_score']}/{totals['total_possible']}")
 
             with open("evaluation_report.pdf", "rb") as file:
                 btn = st.download_button(
@@ -93,3 +91,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
