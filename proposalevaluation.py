@@ -2,7 +2,7 @@ import streamlit as st
 import fitz  # PyMuPDF for handling PDFs
 import google.generativeai as genai
 
-# Initialize Google Gemini with API Key
+# Initialize Google Gemini with API Key from Streamlit Secrets
 genai.configure(api_key=st.secrets["google_gen_ai"]["api_key"])
 
 def read_pdf(uploaded_file):
@@ -13,8 +13,7 @@ def read_pdf(uploaded_file):
         text += page.get_text()
     return text
 
-def evaluate_with_gemini(proposal_text, sections, api_key):
-    genai.configure(api_key=api_key)
+def evaluate_with_gemini(proposal_text, sections):
     model = genai.GenerativeModel("gemini-pro")
     chat = model.start_chat(history=[])
     responses = {}
@@ -42,7 +41,7 @@ def main():
     if uploaded_file is not None:
         proposal_text = read_pdf(uploaded_file)
         if st.button("Evaluate Proposal"):
-            scores = evaluate_with_gemini(proposal_text, sections, st.secrets["google_gen_ai"]["api_key"])
+            scores = evaluate_with_gemini(proposal_text, sections)
             df_scores = pd.DataFrame.from_dict(scores, orient='index', columns=['evaluation', 'max_points'])
             st.table(df_scores)
             st.subheader("Detailed Feedback and Suggestions")
