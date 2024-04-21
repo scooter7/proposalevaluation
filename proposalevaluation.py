@@ -16,7 +16,8 @@ def evaluate_with_openai(proposal_text, sections, api_key):
     responses = {}
     for section in sections:
         prompt = f"Please provide a detailed evaluation and suggestions for improvement for the section '{section['name']}':\n{proposal_text[:2000]}"
-        response = openai.Completion.create(
+        response = 
+        response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             prompt=prompt,
             max_tokens=1024,
