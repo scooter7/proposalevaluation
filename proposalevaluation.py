@@ -25,7 +25,8 @@ def evaluate_with_gemini(proposal_text, sections):
         message = f"Please evaluate the section '{section['name']}' for its effectiveness, clarity, and accuracy in the proposal: {proposal_text[:2000]}"
         response = chat.send_message(message)
         evaluation = response.text.strip()
-        score = min(len(evaluation.split()) * (section['points'] / total_possible_points), section['points'])
+        score = len(evaluation) / 100  # Placeholder for demonstration
+        score = min(score, section['points'] if section['points'] > 0 else 1)  # Ensure section points are not zero
         total_scored_points += score
         responses[section['name']] = {
             'evaluation': evaluation,
@@ -60,7 +61,7 @@ def main():
     for i in range(int(num_sections)):
         with st.expander(f"Section {i + 1} Details"):
             section_name = st.text_input(f"Name of section {i + 1}", key=f"name_{i}")
-            section_points = st.number_input(f"Percentage Points for section {i + 1}", min_value=0, max_value=100, step=1, key=f"points_{i}")
+            section_points = st.number_input(f"Percentage Points for section {i + 1}", min_value=1, max_value=100, step=1, key=f"points_{i}")
             sections.append({'name': section_name, 'points': section_points})
 
     uploaded_file = st.file_uploader("Upload your proposal PDF", type=["pdf"])
