@@ -1,5 +1,5 @@
 import streamlit as st
-import fitz
+import fitz  # PyMuPDF for handling PDFs
 import pandas as pd
 import openai
 
@@ -7,7 +7,7 @@ def read_pdf(uploaded_file):
     # Convert Streamlit UploadedFile to bytes
     file_stream = uploaded_file.read()
     # Open the PDF with PyMuPDF using the bytes
-    doc = fitz.open(stream=file_stream, filetype="pdf")
+    doc = fitz.open("pdf", file_stream)
     text = ""
     for page in doc:
         text += page.get_text()
@@ -16,14 +16,16 @@ def read_pdf(uploaded_file):
 def evaluate_with_openai(proposal_text, sections):
     responses = {}
     for section in sections:
-        response = openai.Completion.create(
-            model="text-davinci-004",
-            prompt=f"Provide a detailed evaluation and suggestions for the section '{section['name']}' in the following text: {proposal_text[:4000]}",
-            max_tokens=1024,
-            temperature=0.5
+        # Use the new OpenAI API syntax for calling the model
+        response = openai.ChatCompletion.create(
+            model="gpt-4",  # Ensure you use the correct model ID, such as "text-davinci-004"
+            messages=[
+                {"role": "system", "content": "You are a sophisticated AI trained to evaluate proposals."},
+                {"role": "user", "content": f"Provide a detailed evaluation and suggestions for the section '{section['name']}' in the following text: {proposal_text[:4000]}"}
+            ]
         )
         responses[section['name']] = {
-            'evaluation': response['choices'][0].text.strip(),
+            'evaluation': response['choices'][0]['message']['content'],
             'max_points': section['points']
         }
     return responses
