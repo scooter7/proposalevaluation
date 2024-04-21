@@ -1,5 +1,6 @@
 import streamlit as st
 import fitz  # PyMuPDF for handling PDFs
+import pandas as pd  # Import pandas correctly
 import google.generativeai as genai
 
 # Initialize Google Gemini with API Key from Streamlit Secrets
