@@ -26,9 +26,9 @@ def evaluate_with_gemini(proposal_text, sections):
         message = f"Please provide a detailed evaluation and suggestions for improvement for the section '{section['name']}': {proposal_text[:2000]}"
         response = chat.send_message(message)
         evaluation = response.text.strip()
-        # Example scoring logic, replace with your specific criteria
-        score = len(evaluation) / 100  # Placeholder for demonstration
-        score = min(score, section['points'])
+        # Simple scoring logic based on content analysis
+        # Here we assume scoring based on some criteria you define; this is a placeholder:
+        score = min(len(evaluation.split()) / 10, section['points'])
         total_scored_points += score
         responses[section['name']] = {
             'evaluation': evaluation,
@@ -36,22 +36,20 @@ def evaluate_with_gemini(proposal_text, sections):
             'max_points': section['points']
         }
 
-    totals = {'total_score': total_scored_points, 'total_possible': total_possible_points}
-    return responses, totals
+    return responses, total_scored_points, total_possible_points
 
-def create_pdf(report_data):
+def create_pdf(report_data, total_score, total_possible):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size = 12)
     pdf.cell(200, 10, txt = "Proposal Evaluation Report", ln = True, align = 'C')
 
     for section, data in report_data.items():
-        if section not in ['total_score', 'total_possible']:
-            pdf.cell(200, 10, txt = f"Section: {section}", ln = True)
-            pdf.cell(200, 10, txt = f"Evaluation: {data['evaluation']}", ln = True)
-            pdf.cell(200, 10, txt = f"Score: {data['score']}/{data['max_points']}", ln = True)
+        pdf.cell(200, 10, txt = f"Section: {section}", ln = True)
+        pdf.cell(200, 10, txt = f"Evaluation: {data['evaluation']}", ln = True)
+        pdf.cell(200, 10, txt = f"Score: {data['score']}/{data['max_points']}", ln = True)
 
-    pdf.cell(200, 10, txt = f"Total Score: {report_data['total_score']}/{report_data['total_possible']}", ln = True)
+    pdf.cell(200, 10, txt = f"Total Score: {total_score}/{total_possible}", ln = True)
     pdf.output("evaluation_report.pdf")
 
 def main():
@@ -69,17 +67,17 @@ def main():
     if uploaded_file is not None:
         proposal_text = read_pdf(uploaded_file)
         if st.button("Evaluate Proposal"):
-            scores, totals = evaluate_with_gemini(proposal_text, sections)
+            scores, total_score, total_possible = evaluate_with_gemini(proposal_text, sections)
             df_scores = pd.DataFrame.from_dict(scores, orient='index', columns=['evaluation', 'score', 'max_points'])
             st.table(df_scores)
-            create_pdf(scores)
+            create_pdf(scores, total_score, total_possible)
             st.subheader("Detailed Feedback and Suggestions")
             for section, data in scores.items():
                 st.markdown(f"### {section}")
                 st.write("Evaluation:", data['evaluation'])
                 st.write("Score:", f"{data['score']}/{data['max_points']}")
             st.markdown(f"### Total Score")
-            st.write("Score:", f"{totals['total_score']}/{totals['total_possible']}")
+            st.write("Score:", f"{total_score}/{total_possible}")
 
             with open("evaluation_report.pdf", "rb") as file:
                 btn = st.download_button(
@@ -91,4 +89,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
