@@ -15,14 +15,15 @@ def evaluate_with_openai(proposal_text, sections, api_key):
     openai.api_key = api_key
     responses = {}
     for section in sections:
-        prompt = f"Please provide a detailed evaluation and suggestions for improvement for the following section '{section['name']}':\n{proposal_text[:2000]}"
-        response = openai.Completion.create(
-            model="text-davinci-004",
-            prompt=prompt,
-            max_tokens=1024,
-            temperature=0.5
+        prompt = f"Please provide a detailed evaluation and suggestions for improvement for the section '{section['name']}':\n{proposal_text[:2000]}"
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are an AI trained to analyze and provide feedback on text."},
+                {"role": "user", "content": prompt}
+            ]
         )
-        evaluation_text = response.choices[0].text.strip()
+        evaluation_text = response['choices'][0]['message']['content'].strip()
         responses[section['name']] = {
             'evaluation': evaluation_text,
             'max_points': section['points']
