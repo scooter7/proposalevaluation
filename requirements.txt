@@ -1,4 +1,3 @@
 streamlit
 PyMuPDF
-pandas
-openai
+google-generativeai
