@@ -3,8 +3,11 @@ import fitz
 import pandas as pd
 import openai
 
-def read_pdf(file):
-    doc = fitz.open(stream=file, filetype="pdf")
+def read_pdf(uploaded_file):
+    # Convert Streamlit UploadedFile to bytes
+    file_stream = uploaded_file.read()
+    # Open the PDF with PyMuPDF using the bytes
+    doc = fitz.open(stream=file_stream, filetype="pdf")
     text = ""
     for page in doc:
         text += page.get_text()
