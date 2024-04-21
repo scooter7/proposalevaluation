@@ -1,7 +1,9 @@
 import streamlit as st
 import fitz  # PyMuPDF for handling PDFs
-import pandas as pd
-import openai
+import google.generativeai as genai
+
+# Initialize Google Gemini with API Key
+genai.configure(api_key=st.secrets["google_gen_ai"]["api_key"])
 
 def read_pdf(uploaded_file):
     file_stream = uploaded_file.read()
@@ -11,21 +13,16 @@ def read_pdf(uploaded_file):
         text += page.get_text()
     return text
 
-def evaluate_with_openai(proposal_text, sections, api_key):
-    openai.api_key = api_key
+def evaluate_with_gemini(proposal_text, sections, api_key):
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel("gemini-pro")
+    chat = model.start_chat(history=[])
     responses = {}
     for section in sections:
-        prompt = f"Please provide a detailed evaluation and suggestions for improvement for the section '{section['name']}':\n{proposal_text[:2000]}"
-        response = openai.Completion.create(
-            model="gpt-3.5-turbo",
-            prompt=prompt,
-            max_tokens=1024,
-            temperature=0.5,
-            stop=None
-        )
-        evaluation_text = response['choices'][0]['text'].strip()
+        message = f"Please provide a detailed evaluation and suggestions for improvement for the section '{section['name']}': {proposal_text[:2000]}"
+        response = chat.send_message(message)
         responses[section['name']] = {
-            'evaluation': evaluation_text,
+            'evaluation': response.text.strip(),
             'max_points': section['points']
         }
     return responses
@@ -45,7 +42,7 @@ def main():
     if uploaded_file is not None:
         proposal_text = read_pdf(uploaded_file)
         if st.button("Evaluate Proposal"):
-            scores = evaluate_with_openai(proposal_text, sections, st.secrets["openai"]["api_key"])
+            scores = evaluate_with_gemini(proposal_text, sections, st.secrets["google_gen_ai"]["api_key"])
             df_scores = pd.DataFrame.from_dict(scores, orient='index', columns=['evaluation', 'max_points'])
             st.table(df_scores)
             st.subheader("Detailed Feedback and Suggestions")
