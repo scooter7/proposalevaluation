@@ -118,21 +118,31 @@ def main():
     if uploaded_file is not None:
         proposal_text = read_pdf(uploaded_file)
         if st.button("Evaluate Proposal"):
-            evaluations = evaluate_with_gemini(proposal_text, sections)
+            evaluations = evaluate_with_gemini(proposal_text, sections, expertise)  # Pass expertise argument
             st.session_state.evaluations = evaluations  # Save evaluations in session state
             display_initial_evaluations(evaluations)
 
     if "evaluations" in st.session_state:
         if st.button("Review and Edit Evaluations"):
             display_revision_interface(st.session_state.evaluations)
-            if st.button("Finalize and Download Report"):
-                pdf_file = create_pdf(st.session_state.evaluations)
-                st.download_button(
-                    label="Download Evaluation Report",
-                    data=pdf_file.getvalue(),
-                    file_name="evaluation_report.pdf",
-                    mime="application/pdf"
-                )
+            if st.button("Save Edited Evaluations"):
+                st.session_state.evaluations = {}  # Clear previous evaluations
+                # Retrieve edited evaluations and update session state
+                for i, section_name in enumerate(sections.keys()):
+                    evaluation = st.text_area(f"Edit evaluation for '{section_name}'", value="")
+                    max_points_key = f"max_points_{i}"
+                    max_points = st.text_input(f"Max points for '{section_name}'", key=max_points_key)
+                    st.session_state.evaluations[section_name] = {'evaluation': evaluation, 'max_points': max_points}
+                st.experimental_rerun()  # Rerun the app to reflect the changes
+
+    if st.button("Finalize and Download Report"):
+        pdf_file = create_pdf(st.session_state.evaluations)
+        st.download_button(
+            label="Download Evaluation Report",
+            data=pdf_file.getvalue(),
+            file_name="evaluation_report.pdf",
+            mime="application/pdf"
+        )
 
 if __name__ == "__main__":
     main()
