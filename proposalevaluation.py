@@ -24,7 +24,7 @@ def evaluate_with_gemini(proposal_text, sections, expertise):
         message = f"As an expert in {expertise}, evaluate how well the section '{section['name']}' addresses {expertise} in terms of prose, structure, format, and demonstration of expertise: {proposal_text[:2000]}"
         response = chat.send_message(message)
         evaluation = response.text.strip()
-        score = qualitative_scoring(evaluation)
+        score = calculate_score(evaluation, section['max_points'])
         responses[section['name']] = {
             'evaluation': evaluation,
             'score': score,
@@ -32,23 +32,22 @@ def evaluate_with_gemini(proposal_text, sections, expertise):
         }
     return responses, total_points_possible
 
-def qualitative_scoring(evaluation):
-    # This is a placeholder function to simulate qualitative scoring
-    points = len(set(evaluation.split()))  # Simplistic: unique word count as a proxy for content richness
-    return points
+def calculate_score(evaluation, max_points):
+    # Simulated qualitative scoring based on relevance and completeness
+    relevance = sum(1 for word in evaluation.lower().split() if len(word) > 4)  # count longer words as a proxy for content depth
+    completeness = min(relevance / 10, 1)  # assuming 10 relevant terms as fully complete
+    score = min(completeness * max_points, max_points)
+    return score
 
-def create_pdf(report_data, total_points_possible):
+def create_pdf(report_data):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size = 12)
     pdf.cell(200, 10, txt="Proposal Evaluation Report", ln=True, align='C')
-    total_score_achieved = 0
     for section, data in report_data.items():
         pdf.cell(200, 10, txt=f"Section: {section}", ln=True)
         pdf.cell(200, 10, txt=f"Evaluation: {data['evaluation']}", ln=True)
         pdf.cell(200, 10, txt=f"Score: {data['score']}/{data['max_points']}", ln=True)
-        total_score_achieved += data['score']
-    pdf.cell(200, 10, txt=f"Total Score Achieved: {total_score_achieved} out of {total_points_possible}", ln=True)
     pdf_output = BytesIO()
     pdf.output(pdf_output, 'F')
     pdf_output.seek(0)
@@ -73,7 +72,7 @@ def main():
             df_scores = pd.DataFrame([{**{'Section': k}, **v} for k, v in evaluations.items()])
             st.table(df_scores)
             if st.button("Download Evaluation Report"):
-                pdf_file = create_pdf(evaluations, total_points_possible)
+                pdf_file = create_pdf(evaluations)
                 st.download_button(
                     label="Download Evaluation Report",
                     data=pdf_file,
