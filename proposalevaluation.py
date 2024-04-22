@@ -29,9 +29,7 @@ def evaluate_with_gemini(proposal_text, sections, expertise):
         )
         response = chat.send_message(prompt)
         evaluation = response.text.strip()
-        relevance = len(evaluation.split())  # Simplistic approach to gauge content relevance
-        score = relevance / (10 * len(section['name']))  # Adjusted for discernment based on section length
-        score = min(score * 100, section['points'])  # Scale score to max points
+        score = min(len(evaluation.split()), section['points'])  # Adjusted for discernment based on section content
         responses[section['name']] = {
             'evaluation': evaluation,
             'score': score,
@@ -57,9 +55,9 @@ def display_revision_interface(evaluations):
     revised_evaluations = {}
     for section, data in evaluations.items():
         with st.container():
-            revised_eval = st.text_area(f"Edit evaluation for '{section}':", data['evaluation'], key=f"edit_{section}")
-            revised_score = st.slider(f"Adjust score for '{section}':", 0, data['max_points'], int(data['score']), key=f"score_{section}")
-            revised_evaluations[section] = {'evaluation': revised_eval, 'score': revised_score, 'max_points': data['max_points']}
+            revised_evaluation = st.text_area(f"Edit evaluation for '{section}':", data['evaluation'])
+            revised_score = st.slider(f"Adjust score for '{section}':", 0, data['max_points'], int(data['score']))
+            revised_evaluations[section] = {'evaluation': revised_evaluation, 'score': revised_score, 'max_points': data['max_points']}
     return revised_evaluations
 
 def main():
@@ -78,11 +76,15 @@ def main():
         proposal_text = read_pdf(uploaded_file)
         if st.button("Evaluate Proposal"):
             evaluations = evaluate_with_gemini(proposal_text, sections, expertise)
+            st.write("Initial Evaluations:")
+            for section, data in evaluations.items():
+                st.write(f"### {section}")
+                st.write("Evaluation:", data['evaluation'])
+                st.write("Score:", data['score'], "/", data['max_points'])
+            
             if st.button("Review and Edit Evaluations"):
                 evaluations = display_revision_interface(evaluations)
                 if st.button("Finalize and Download Report"):
-                    df_scores = pd.DataFrame([{**{'Section': k}, **v} for k, v in evaluations.items()])
-                    st.table(df_scores)
                     pdf_file = create_pdf(evaluations)
                     st.download_button(
                         label="Download Evaluation Report",
