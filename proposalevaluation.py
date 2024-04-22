@@ -19,15 +19,16 @@ def evaluate_with_gemini(proposal_text, sections, expertise):
     chat = model.start_chat(history=[])
     responses = {}
     for section in sections:
-        message = (f"As an expert in {expertise}, please evaluate the section '{section['name']}' "
-                   f"for its effectiveness, clarity, and accuracy in relation to {expertise}: {proposal_text[:2000]}")
+        message = f"As an expert in {expertise}, please evaluate the section '{section['name']}' for its effectiveness, clarity, and accuracy in relation to {expertise}: {proposal_text[:2000]}"
         response = chat.send_message(message)
         evaluation = response.text.strip()
-        score = min(len(evaluation.split()) * (section['points'] / 100), section['points'])
+        word_count = len(evaluation.split())
+        max_possible_score = section['points']
+        score = min(word_count * (max_possible_score / 100), max_possible_score) if word_count < 100 else max_possible_score * 0.8
         responses[section['name']] = {
             'evaluation': evaluation,
             'score': score,
-            'max_points': section['points']
+            'max_points': max_possible_score
         }
     return responses
 
@@ -35,13 +36,14 @@ def create_pdf(report_data):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size = 12)
-    pdf.cell(200, 10, txt = "Proposal Evaluation Report", ln = True, align = 'C')
+    pdf.cell(200, 10, txt="Proposal Evaluation Report", ln=True, align='C')
     for section, data in report_data.items():
-        pdf.cell(200, 10, txt = f"Section: {section}", ln = True)
-        pdf.cell(200, 10, txt = f"Evaluation: {data['evaluation']}", ln = True)
-        pdf.cell(200, 10, txt = f"Score: {data['score']}/{data['max_points']}", ln = True)
-    pdf.output("evaluation_report.pdf")
-    return pdf
+        pdf.cell(200, 10, txt=f"Section: {section}", ln=True)
+        pdf.cell(200, 10, txt=f"Evaluation: {data['evaluation']}", ln=True)
+        pdf.cell(200, 10, txt=f"Score: {data['score']}/{data['max_points']}", ln=True)
+    pdf_file_path = "evaluation_report.pdf"
+    pdf.output(pdf_file_path)
+    return pdf_file_path
 
 def main():
     st.title("Proposal Evaluation App")
@@ -63,13 +65,13 @@ def main():
             df_scores = pd.DataFrame.from_dict(evaluations, orient='index', columns=['evaluation', 'score', 'max_points'])
             st.table(df_scores)
             if st.button("Download Evaluation Report"):
-                pdf = create_pdf(evaluations)
-                with open("evaluation_report.pdf", "rb") as file:
-                    btn = st.download_button(
+                pdf_file_path = create_pdf(evaluations)
+                with open(pdf_file_path, "rb") as file:
+                    st.download_button(
                         label="Download Evaluation Report",
                         data=file,
                         file_name="evaluation_report.pdf",
-                        mime="application/octet-stream"
+                        mime="application/pdf"
                     )
 
 if __name__ == "__main__":
