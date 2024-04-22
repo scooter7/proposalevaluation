@@ -37,7 +37,6 @@ def evaluate_with_gemini(proposal_text, sections, expertise):
     return responses
 
 def calculate_score(evaluation_text, max_points):
-    # Mapping quality indicators to score thresholds
     score_thresholds = {
         'excellent': 0.9,
         'good': 0.8,
@@ -45,11 +44,15 @@ def calculate_score(evaluation_text, max_points):
         'poor': 0.6,
         'very poor': 0.5
     }
-    # Extracting quality indicators from evaluation text
-    for indicator, threshold in score_thresholds.items():
-        if indicator in evaluation_text.lower():
-            return int(threshold * max_points)
-    return int(0.5 * max_points)  # Default to 50% of max points
+    # Check if any of the quality indicators are mentioned in the evaluation text
+    matching_thresholds = [threshold for indicator, threshold in score_thresholds.items() if indicator in evaluation_text.lower()]
+    if matching_thresholds:
+        # Use the highest matching threshold
+        max_threshold = max(matching_thresholds)
+        return int(max_threshold * max_points)  # Assign score based on matching threshold
+    else:
+        # If no quality indicators are found, raise an error as each section must be evaluated
+        raise ValueError("Evaluation does not indicate quality level (excellent, good, average, poor, very poor)")
 
 def create_pdf(report_data):
     pdf = FPDF()
@@ -61,14 +64,14 @@ def create_pdf(report_data):
         pdf.cell(200, 10, txt=f"Evaluation: {data['evaluation']}", ln=True)
         pdf.cell(200, 10, txt=f"Score: {data['score']}/{data['max_points']}", ln=True)
     pdf_output = BytesIO()
-    pdf.output(pdf_output, 'F')
+    pdf.output(pdf_output)
     pdf_output.seek(0)
     return pdf_output
 
 def display_initial_evaluations(evaluations):
     for section, data in evaluations.items():
         st.write(f"### {section}")
-        st.text_area("Evaluation", value=data['evaluation'], key=f"eval_{section}_view")
+        st.text_area(f"Evaluation for '{section}'", value=data['evaluation'], key=f"eval_{section}_view")
         st.write("Score:", data['score'], "/", data['max_points'])
 
 def display_revision_interface(evaluations):
@@ -87,7 +90,7 @@ def main():
     for i in range(int(num_sections)):
         with st.expander(f"Section {i + 1} Details"):
             section_name = st.text_input(f"Name of section {i + 1}")
-            section_points = st.text_input(f"Max points for '{section_name}'", value="5")
+            section_points = st.text_input(f"Max points for '{section_name}'", value="5", key=f"max_points_{i}")
             sections.append({'name': section_name, 'points': int(section_points)})
 
     uploaded_file = st.file_uploader("Upload your proposal PDF", type=["pdf"])
