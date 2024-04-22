@@ -1,7 +1,8 @@
 import streamlit as st
-import fitz
+import fitz  # PyMuPDF
 import pandas as pd
 from fpdf import FPDF
+from io import BytesIO
 import google.generativeai as genai
 
 genai.configure(api_key=st.secrets["google_gen_ai"]["api_key"])
@@ -19,7 +20,7 @@ def evaluate_with_gemini(proposal_text, sections, expertise):
     chat = model.start_chat(history=[])
     responses = {}
     for section in sections:
-        message = f"As an expert in {expertise}, please evaluate the section '{section['name']}' for its effectiveness, clarity, and accuracy in relation to {expertise}: {proposal_text[:2000]}"
+        message = f"As an expert in {expertise}, please evaluate the section '{section['name']}' for its effectiveness, clarity, and accuracy in relation to {expertise} topics: {proposal_text[:2000]}"
         response = chat.send_message(message)
         evaluation = response.text.strip()
         word_count = len(evaluation.split())
@@ -41,13 +42,15 @@ def create_pdf(report_data):
         pdf.cell(200, 10, txt=f"Section: {section}", ln=True)
         pdf.cell(200, 10, txt=f"Evaluation: {data['evaluation']}", ln=True)
         pdf.cell(200, 10, txt=f"Score: {data['score']}/{data['max_points']}", ln=True)
-    pdf_file_path = "evaluation_report.pdf"
-    pdf.output(pdf_file_path)
-    return pdf_file_path
+    pdf_output = BytesIO()
+    pdf.output(pdf_output, 'F')
+    pdf_output.seek(0)
+    return pdf_output
 
 def main():
     st.title("Proposal Evaluation App")
     expertise = st.text_input("Enter your field of expertise", value="technology")
+    st.write(f"You're an {expertise} expert, known for decades of meticulous study, review, and evaluation of {expertise} projects and proposals.")
     num_sections = st.number_input("How many sections does your proposal have?", min_value=1, max_value=10, step=1)
     sections = []
     for i in range(int(num_sections)):
@@ -64,14 +67,13 @@ def main():
             df_scores = pd.DataFrame.from_dict(evaluations, orient='index', columns=['evaluation', 'score', 'max_points'])
             st.table(df_scores)
             if st.button("Download Evaluation Report"):
-                pdf_file_path = create_pdf(evaluations)
-                with open(pdf_file_path, "rb") as file:
-                    st.download_button(
-                        label="Download Evaluation Report",
-                        data=file,
-                        file_name="evaluation_report.pdf",
-                        mime="application/pdf"
-                    )
+                pdf_file = create_pdf(evaluations)
+                st.download_button(
+                    label="Download Evaluation Report",
+                    data=pdf_file,
+                    file_name="evaluation_report.pdf",
+                    mime="application/pdf"
+                )
 
 if __name__ == "__main__":
     main()
