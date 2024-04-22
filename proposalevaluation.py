@@ -21,18 +21,21 @@ def evaluate_with_gemini(proposal_text, sections, expertise):
     responses = {}
     total_points_possible = sum(section['max_points'] for section in sections)
     for section in sections:
-        message = f"As an expert in {expertise}, please evaluate the section '{section['name']}' for its effectiveness, clarity, and accuracy in relation to {expertise} topics: {proposal_text[:2000]}"
+        message = f"As an expert in {expertise}, evaluate how well the section '{section['name']}' addresses {expertise} in terms of prose, structure, format, and demonstration of expertise: {proposal_text[:2000]}"
         response = chat.send_message(message)
         evaluation = response.text.strip()
-        words = len(evaluation.split())
-        score_percentage = min(words / 100, 1)  # Example scoring mechanism based on word count
-        score = min(score_percentage * section['max_points'], section['max_points'])
+        score = qualitative_scoring(evaluation)
         responses[section['name']] = {
             'evaluation': evaluation,
             'score': score,
             'max_points': section['max_points']
         }
     return responses, total_points_possible
+
+def qualitative_scoring(evaluation):
+    # This is a placeholder function to simulate qualitative scoring
+    points = len(set(evaluation.split()))  # Simplistic: unique word count as a proxy for content richness
+    return points
 
 def create_pdf(report_data, total_points_possible):
     pdf = FPDF()
@@ -51,13 +54,6 @@ def create_pdf(report_data, total_points_possible):
     pdf_output.seek(0)
     return pdf_output
 
-def display_initial_evaluation(evaluations):
-    corrections = {}
-    for section, evaluation in evaluations.items():
-        corrected_text = st.text_area(f"Review and edit the evaluation for '{section}':", value=evaluation, key=f"feedback_{section}")
-        corrections[section] = corrected_text
-    return corrections
-
 def main():
     st.title("Proposal Evaluation App")
     expertise = st.text_input("Enter your field of expertise", value="technology")
@@ -74,19 +70,16 @@ def main():
         proposal_text = read_pdf(uploaded_file)
         if st.button("Evaluate Proposal"):
             evaluations, total_points_possible = evaluate_with_gemini(proposal_text, sections, expertise)
-            corrections = display_initial_evaluation(evaluations)
-            if st.button("Submit Corrections"):
-                final_evaluations = corrections
-                df_scores = pd.DataFrame(list(final_evaluations.items()), columns=['Section', 'Evaluation'])
-                st.table(df_scores)
-                if st.button("Download Evaluation Report"):
-                    pdf_file = create_pdf(final_evaluations, total_points_possible)
-                    st.download_button(
-                        label="Download Evaluation Report",
-                        data=pdf_file,
-                        file_name="evaluation_report.pdf",
-                        mime="application/pdf"
-                    )
+            df_scores = pd.DataFrame([{**{'Section': k}, **v} for k, v in evaluations.items()])
+            st.table(df_scores)
+            if st.button("Download Evaluation Report"):
+                pdf_file = create_pdf(evaluations, total_points_possible)
+                st.download_button(
+                    label="Download Evaluation Report",
+                    data=pdf_file,
+                    file_name="evaluation_report.pdf",
+                    mime="application/pdf"
+                )
 
 if __name__ == "__main__":
     main()
