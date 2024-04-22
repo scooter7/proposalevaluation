@@ -76,10 +76,12 @@ def create_pdf(report_data):
     pdf.add_page()
     pdf.set_font("Arial", size=12)
     pdf.cell(200, 10, txt="Proposal Evaluation Report", ln=True, align='C')
+
     for section, data in report_data.items():
         pdf.cell(200, 10, txt=f"Section: {section}", ln=True)
         pdf.cell(200, 10, txt=f"Evaluation: {data['evaluation']}", ln=True)
         pdf.cell(200, 10, txt=f"Score: {data['score']}/{data['max_points']}", ln=True)
+
     pdf_output = BytesIO()
     pdf.output(pdf_output)
     pdf_output.seek(0)
@@ -101,41 +103,36 @@ def display_revision_interface(evaluations):
 
 def main():
     st.title("Proposal Evaluation App")
-    expertise = st.text_input("Enter your field of expertise", value="environmental science")
+    expertise = st.text_input("Enter your field of expertise", value="")
+
+    st.write(f"You're an {expertise} expert, known for decades of meticulous study, review, and evaluation of projects and proposals.")
     num_sections = st.number_input("How many sections does your proposal have?", min_value=1, max_value=10, step=1)
-    sections = []
+    sections = {}
+
     for i in range(int(num_sections)):
-        with st.expander(f"Section {i + 1} Details"):
-            section_name = st.text_input(f"Name of section {i + 1}")
-            section_points = st.text_input(f"Max points for '{section_name}'", value="5", key=f"max_points_{i}")
-            sections.append({'name': section_name, 'points': int(section_points)})
+        section_name = st.text_input(f"Name of section {i + 1}")
+        max_points = st.text_input(f"Max points for '{section_name}'", key=f"max_points_{i}")
+        sections[section_name] = {'max_points': max_points}
 
     uploaded_file = st.file_uploader("Upload your proposal PDF", type=["pdf"])
     if uploaded_file is not None:
         proposal_text = read_pdf(uploaded_file)
-        evaluations = evaluate_with_gemini(proposal_text, sections, expertise)
-        st.session_state.evaluations = evaluations  # Initialize or update the session state with evaluations
-        display_initial_evaluations(evaluations)
+        if st.button("Evaluate Proposal"):
+            evaluations = evaluate_with_gemini(proposal_text, sections)
+            st.session_state.evaluations = evaluations  # Save evaluations in session state
+            display_initial_evaluations(evaluations)
 
+    if "evaluations" in st.session_state:
         if st.button("Review and Edit Evaluations"):
             display_revision_interface(st.session_state.evaluations)
-            if st.button("Save Edited Evaluations"):
-                st.session_state.evaluations = {section: {'evaluation': st.session_state.evaluations[section]['evaluation'], 
-                                                          'score': calculate_score(st.session_state.evaluations[section]['evaluation'], 
-                                                                                   st.session_state.evaluations[section]['max_points']),
-                                                          'max_points': st.session_state.evaluations[section]['max_points']}
-                                                 for section in st.session_state.evaluations}
-                st.experimental_rerun()  # Rerun the app to reflect the updated evaluations
-
-        if st.button("Finalize and Download Report"):
-            evaluations = st.session_state.evaluations
-            pdf_file = create_pdf(evaluations)
-            st.download_button(
-                label="Download Evaluation Report",
-                data=pdf_file,
-                file_name="evaluation_report.pdf",
-                mime="application/pdf"
-            )
+            if st.button("Finalize and Download Report"):
+                pdf_file = create_pdf(st.session_state.evaluations)
+                st.download_button(
+                    label="Download Evaluation Report",
+                    data=pdf_file.getvalue(),
+                    file_name="evaluation_report.pdf",
+                    mime="application/pdf"
+                )
 
 if __name__ == "__main__":
     main()
