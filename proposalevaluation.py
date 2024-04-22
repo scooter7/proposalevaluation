@@ -37,12 +37,19 @@ def evaluate_with_gemini(proposal_text, sections, expertise):
     return responses
 
 def calculate_score(evaluation_text, max_points):
-    quality_indicators = ['excellent', 'good', 'adequate', 'poor']
-    score_multiplier = {'excellent': 0.9, 'good': 0.75, 'adequate': 0.5, 'poor': 0.25, 'default': 0.1}
-    for indicator in quality_indicators:
+    # Mapping quality indicators to score thresholds
+    score_thresholds = {
+        'excellent': 0.9,
+        'good': 0.8,
+        'average': 0.7,
+        'poor': 0.6,
+        'very poor': 0.5
+    }
+    # Extracting quality indicators from evaluation text
+    for indicator, threshold in score_thresholds.items():
         if indicator in evaluation_text.lower():
-            return max_points * score_multiplier[indicator]
-    return max_points * score_multiplier['default']
+            return int(threshold * max_points)
+    return int(0.5 * max_points)  # Default to 50% of max points
 
 def create_pdf(report_data):
     pdf = FPDF()
@@ -78,7 +85,7 @@ def main():
     for i in range(int(num_sections)):
         with st.expander(f"Section {i + 1} Details"):
             section_name = st.text_input(f"Name of section {i + 1}")
-            section_points = st.number_input(f"Maximum Points for section {i + 1}", min_value=1, max_value=100)
+            section_points = st.slider(f"Max points for '{section_name}'", 1, 10, 5)
             sections.append({'name': section_name, 'points': section_points})
 
     uploaded_file = st.file_uploader("Upload your proposal PDF", type=["pdf"])
