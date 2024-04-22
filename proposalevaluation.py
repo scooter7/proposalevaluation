@@ -29,10 +29,8 @@ def evaluate_with_gemini(proposal_text, sections, expertise):
         )
         response = chat.send_message(prompt)
         evaluation = response.text.strip()
-        score = min(len(evaluation.split()), section['points'])  # Adjusted for discernment based on section content
         responses[section['name']] = {
             'evaluation': evaluation,
-            'score': score,
             'max_points': section['points']
         }
     return responses
@@ -52,13 +50,10 @@ def create_pdf(report_data):
     return pdf_output
 
 def display_revision_interface(evaluations):
-    revised_evaluations = {}
     for section, data in evaluations.items():
         with st.container():
-            revised_evaluation = st.text_area(f"Edit evaluation for '{section}':", data['evaluation'])
-            revised_score = st.slider(f"Adjust score for '{section}':", 0, data['max_points'], int(data['score']))
-            revised_evaluations[section] = {'evaluation': revised_evaluation, 'score': revised_score, 'max_points': data['max_points']}
-    return revised_evaluations
+            data['evaluation'] = st.text_area(f"Edit evaluation for '{section}':", value=data['evaluation'])
+            data['score'] = st.slider(f"Adjust score for '{section}':", 0, data['max_points'], value=int(data['score']))
 
 def main():
     st.title("Proposal Evaluation App")
@@ -74,24 +69,19 @@ def main():
     uploaded_file = st.file_uploader("Upload your proposal PDF", type=["pdf"])
     if uploaded_file is not None:
         proposal_text = read_pdf(uploaded_file)
-        if st.button("Evaluate Proposal"):
-            evaluations = evaluate_with_gemini(proposal_text, sections, expertise)
-            st.write("Initial Evaluations:")
-            for section, data in evaluations.items():
-                st.write(f"### {section}")
-                st.write("Evaluation:", data['evaluation'])
-                st.write("Score:", data['score'], "/", data['max_points'])
-            
-            if st.button("Review and Edit Evaluations"):
-                evaluations = display_revision_interface(evaluations)
-                if st.button("Finalize and Download Report"):
-                    pdf_file = create_pdf(evaluations)
-                    st.download_button(
-                        label="Download Evaluation Report",
-                        data=pdf_file,
-                        file_name="evaluation_report.pdf",
-                        mime="application/pdf"
-                    )
+        evaluations = evaluate_with_gemini(proposal_text, sections, expertise)
+        st.session_state.evaluations = evaluations  # Save to session state
+        display_initial_evaluations(evaluations)
+        if st.button("Review and Edit Evaluations"):
+            display_revision_interface(st.session_state.evaluations)
+            if st.button("Finalize and Download Report"):
+                pdf_file = create_pdf(st.session_state.evaluations)
+                st.download_button(
+                    label="Download Evaluation Report",
+                    data=pdf_file,
+                    file_name="evaluation_report.pdf",
+                    mime="application/pdf"
+                )
 
 if __name__ == "__main__":
     main()
