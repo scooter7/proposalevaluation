@@ -20,12 +20,13 @@ def evaluate_with_gemini(proposal_text, sections, expertise):
     responses = {}
     for section in sections:
         prompt = (
-            f"As an expert on {expertise}, evaluate the section '{section['name']}' in the context of {expertise} projects and proposals. "
-            f"Focus your evaluation on:\n"
-            f"- Prose: Assess the clarity and precision of the language.\n"
-            f"- Structure: Review the logical flow and coherence.\n"
-            f"- Format: Evaluate how the formatting enhances readability.\n"
-            f"Provide detailed commentary and suggestions for improvement."
+            f"You're an expert in {expertise}, known for two decades of meticulous study, review, and evaluation of {expertise} projects and proposals.\n\n"
+            f"You will be given a proposal submission to consider. Your task will involve a comprehensive review of it based on your subject matter expertise, and the project's defined sections.\n\n"
+            f"In your evaluation, you will provide an overall score supported by detailed commentary on each section. Additionally, you will write a report offering feedback to the Respondent and suggestions for improving the submission. Areas to focus on include:\n\n"
+            f"Prose: Assess the clarity and precision of the language used in each section. Evaluate how effectively the language facilitates comprehension of the offerings and methodologies.\n\n"
+            f"Structure: Review the logical flow and coherence of the sections. Ensure that the points are presented in a well-organized manner that aligns with procurement evaluation protocols.\n\n"
+            f"Format: Evaluate the professional formatting of the documents. Consider how the formatting enhances readability, making it easier for procurement teams to locate critical information.\n\n"
+            f"Value: Whenever prices or fees are presented, please assess the extent to which the dollar values seem to be a good value in terms of the services offered."
         )
         response = chat.send_message(prompt)
         evaluation = response.text.strip()
