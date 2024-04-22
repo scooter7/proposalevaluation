@@ -38,10 +38,8 @@ def evaluate_with_gemini(proposal_text, sections, expertise):
     return responses
 
 def calculate_score(evaluation_text, max_points):
-    # Evaluate the quality of the evaluation text based on qualitative criteria related to the area of expertise
-    # Adjust the scoring based on the overall quality
+    max_points = int(max_points)
     evaluation_quality = evaluate_quality(evaluation_text)
-    score = 0
     if evaluation_quality == "excellent":
         score = int(0.9 * max_points)
     elif evaluation_quality == "good":
@@ -52,13 +50,11 @@ def calculate_score(evaluation_text, max_points):
         score = int(0.6 * max_points)
     elif evaluation_quality == "very poor":
         score = int(0.5 * max_points)
+    else:
+        score = 0
     return score
 
 def evaluate_quality(evaluation_text):
-    # Perform a qualitative analysis of the evaluation text based on the defined area of expertise
-    # Determine the overall quality of the evaluation text
-    # This function should be replaced with actual evaluation logic based on the area of expertise
-    # Example criteria: relevance, depth of analysis, clarity of explanation, etc.
     if "relevant" in evaluation_text.lower() and "well-analyzed" in evaluation_text.lower():
         return "excellent"
     elif "relevant" in evaluation_text.lower():
@@ -103,11 +99,13 @@ def main():
     expertise = st.text_input("Enter your field of expertise", value="environmental science")
     num_sections = st.number_input("How many sections does your proposal have?", min_value=1, max_value=10, step=1)
     sections = []
+    total_possible_points = 0
     for i in range(int(num_sections)):
         with st.expander(f"Section {i + 1} Details"):
             section_name = st.text_input(f"Name of section {i + 1}")
             section_points = st.text_input(f"Max points for '{section_name}'", value="5", key=f"max_points_{i}")
             sections.append({'name': section_name, 'points': int(section_points)})
+            total_possible_points += int(section_points)
 
     uploaded_file = st.file_uploader("Upload your proposal PDF", type=["pdf"])
     if uploaded_file is not None:
@@ -119,10 +117,15 @@ def main():
         if st.button("Review and Edit Evaluations"):
             display_revision_interface(st.session_state.evaluations)
             if st.button("Save Edited Evaluations"):
-                st.session_state.evaluations = {section: {'evaluation': st.session_state.evaluations[section]['evaluation'], 
-                                                          'score': int(st.session_state.evaluations[section]['score']),
-                                                          'max_points': int(st.session_state.evaluations[section]['max_points'])}
-                                                 for section in st.session_state.evaluations}
+                for section, data in st.session_state.evaluations.items():
+                    data['max_points'] = int(data['max_points'])  # Convert max points to integer
+                    data['score'] = int(data['score'])  # Convert score to integer
+                    # Validate and adjust score if it exceeds max points
+                    if data['score'] > data['max_points']:
+                        data['score'] = data['max_points']
+                    # Validate and adjust max points if it exceeds total possible points
+                    if data['max_points'] > total_possible_points:
+                        data['max_points'] = total_possible_points
                 st.experimental_rerun()  # Rerun the app to reflect the updated evaluations
 
         if st.button("Finalize and Download Report"):
