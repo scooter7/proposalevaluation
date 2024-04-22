@@ -15,25 +15,18 @@ def read_pdf(uploaded_file):
     return text
 
 def evaluate_with_gemini(proposal_text, sections, expertise):
-    model = genai.GenerativeModel("gemini-pro")
-    chat = model.start_chat(history=[])
     responses = {}
-    for section in sections:
+    for section_name, section_details in sections.items():
         prompt = (
-            f"As an expert on {expertise}, evaluate the section '{section['name']}' in the context of {expertise} projects and proposals. "
+            f"As an expert on {expertise}, evaluate the section '{section_name}'. "
             f"Focus your evaluation on:\n"
-            f"- Prose: Assess the clarity and precision of the language.\n"
-            f"- Structure: Review the logical flow and coherence.\n"
-            f"- Format: Evaluate how the formatting enhances readability.\n"
-            f"Provide detailed commentary and suggestions for improvement."
+            "- Prose: Assess the clarity and precision of the language.\n"
+            "- Structure: Review the logical flow and coherence.\n"
+            "- Format: Evaluate the professional formatting of the document."
         )
-        response = chat.send_message(prompt)
-        evaluation = response.text.strip()
-        responses[section['name']] = {
-            'evaluation': evaluation,
-            'score': calculate_score(evaluation, section['points']),
-            'max_points': section['points']
-        }
+        evaluation = st.text_area(prompt)
+        score = calculate_score(evaluation, section_details['max_points'])
+        responses[section_name] = {'evaluation': evaluation, 'score': score, 'max_points': section_details['max_points']}
     return responses
 
 def calculate_score(evaluation_text, max_points):
