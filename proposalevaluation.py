@@ -18,8 +18,8 @@ def evaluate_with_gemini(proposal_text, sections, expertise):
     model = genai.GenerativeModel("gemini-pro")
     chat = model.start_chat(history=[])
     responses = {}
-    total_points = 0  # Track total points for overall score calculation
-    total_score = 0  # Track total score for overall score calculation
+    total_max_points = 0  # Track total maximum points
+    total_awarded_points = 0  # Track total awarded points
     for section in sections:
         prompt = (
             f"You're an expert in {expertise}, known for two decades of meticulous study, review, and evaluation of {expertise} projects and proposals.\n\n"
@@ -32,16 +32,18 @@ def evaluate_with_gemini(proposal_text, sections, expertise):
         )
         response = chat.send_message(prompt)
         evaluation = response.text.strip()
+        max_points = int(section['points'])
+        total_max_points += max_points
+        score = calculate_score(evaluation, max_points)
         responses[section['name']] = {
             'evaluation': evaluation,
-            'score': calculate_score(evaluation, section['points']),
-            'max_points': section['points']
+            'score': score,
+            'max_points': max_points
         }
-        total_points += int(section['points'])
-        total_score += responses[section['name']]['score']
+        total_awarded_points += score
     
     # Calculate overall score
-    overall_score = total_score / total_points if total_points > 0 else 0
+    overall_score = total_awarded_points / total_max_points if total_max_points > 0 else 0
     
     return responses, overall_score
 
@@ -82,7 +84,7 @@ def create_docx(report_data, overall_score):
         doc.add_paragraph(f"Evaluation: {data['evaluation']}")
         doc.add_paragraph(f"Score: {data['score']}/{data['max_points']}")
     doc.add_heading("Overall Score", level=2)
-    doc.add_paragraph(f"Overall Score: {overall_score:.1f}/{len(report_data)}")
+    doc.add_paragraph(f"Overall Score: {overall_score:.1%}")
     doc_output = BytesIO()
     doc.save(doc_output)
     doc_output.seek(0)
