@@ -22,15 +22,18 @@ def evaluate_with_gemini(proposal_text, sections, expertise):
         prompt = (
             f"As an expert on {expertise}, evaluate the section '{section['name']}' in the context of {expertise} projects and proposals. "
             f"Focus your evaluation on:\n"
-            f"- Prose: Clarity and precision of the language.\n"
-            f"- Structure: Logical flow and coherence.\n"
-            f"- Format: Professionalism of the formatting.\n"
-            f"Provide a detailed commentary on these aspects and suggest improvements."
+            f"- Prose: Assess the clarity and precision of the language.\n"
+            f"- Structure: Review the logical flow and coherence.\n"
+            f"- Format: Evaluate how the formatting enhances readability.\n"
+            f"Provide detailed commentary and suggestions for improvement."
         )
         response = chat.send_message(prompt)
         evaluation = response.text.strip()
+        # Initial score calculation - placeholders for now, replace with actual logic as required
+        score = min(len(evaluation.split()) / 10, section['points'])  # A simple proxy for scoring
         responses[section['name']] = {
             'evaluation': evaluation,
+            'score': score,
             'max_points': section['points']
         }
     return responses
@@ -43,7 +46,7 @@ def create_pdf(report_data):
     for section, data in report_data.items():
         pdf.cell(200, 10, txt=f"Section: {section}", ln=True)
         pdf.cell(200, 10, txt=f"Evaluation: {data['evaluation']}", ln=True)
-        pdf.cell(200, 10, txt=f"Maximum Points: {data['max_points']}", ln=True)
+        pdf.cell(200, 10, txt=f"Score: {data['score']}/{data['max_points']}", ln=True)
     pdf_output = BytesIO()
     pdf.output(pdf_output, 'F')
     pdf_output.seek(0)
@@ -52,7 +55,7 @@ def create_pdf(report_data):
 def display_revision_interface(evaluations):
     for section, data in evaluations.items():
         data['evaluation'] = st.text_area(f"Review and edit the evaluation for '{section}':", data['evaluation'])
-        data['score'] = st.slider(f"Score for '{section}':", 0, data['max_points'], int(data['max_points']/2))
+        data['score'] = st.slider(f"Adjust the score for '{section}':", 0, data['max_points'], int(data['score']))
     return evaluations
 
 def main():
@@ -71,11 +74,14 @@ def main():
         proposal_text = read_pdf(uploaded_file)
         if st.button("Evaluate Proposal"):
             evaluations = evaluate_with_gemini(proposal_text, sections, expertise)
+            st.write("Initial Evaluations:")
+            for section, data in evaluations.items():
+                st.write(f"### {section}")
+                st.text_area("Evaluation", value=data['evaluation'], key=f"eval_{section}")
+                st.write("Score:", data['score'], "/", data['max_points'])
             if st.button("Review and Edit Evaluations"):
                 evaluations = display_revision_interface(evaluations)
                 if st.button("Finalize and Download Report"):
-                    df_scores = pd.DataFrame([{**{'Section': k}, **v} for k, v in evaluations.items()])
-                    st.table(df_scores)
                     pdf_file = create_pdf(evaluations)
                     st.download_button(
                         label="Download Evaluation Report",
