@@ -18,6 +18,8 @@ def evaluate_with_gemini(proposal_text, sections, expertise):
     model = genai.GenerativeModel("gemini-pro")
     chat = model.start_chat(history=[])
     responses = {}
+    total_points = 0  # Track total points for overall score calculation
+    total_score = 0  # Track total score for overall score calculation
     for section in sections:
         prompt = (
             f"You're an expert in {expertise}, known for two decades of meticulous study, review, and evaluation of {expertise} projects and proposals.\n\n"
@@ -35,7 +37,13 @@ def evaluate_with_gemini(proposal_text, sections, expertise):
             'score': calculate_score(evaluation, section['points']),
             'max_points': section['points']
         }
-    return responses
+        total_points += int(section['points'])
+        total_score += responses[section['name']]['score']
+    
+    # Calculate overall score
+    overall_score = total_score / total_points if total_points > 0 else 0
+    
+    return responses, overall_score
 
 def calculate_score(evaluation_text, max_points):
     max_points = int(max_points)
@@ -66,13 +74,15 @@ def evaluate_quality(evaluation_text):
     else:
         return "very poor"
 
-def create_docx(report_data):
+def create_docx(report_data, overall_score):
     doc = Document()
     doc.add_heading("Proposal Evaluation Report", level=1)
     for section, data in report_data.items():
         doc.add_heading(f"Section: {section}", level=2)
         doc.add_paragraph(f"Evaluation: {data['evaluation']}")
         doc.add_paragraph(f"Score: {data['score']}/{data['max_points']}")
+    doc.add_heading("Overall Score", level=2)
+    doc.add_paragraph(f"Overall Score: {overall_score:.1f}/{len(report_data)}")
     doc_output = BytesIO()
     doc.save(doc_output)
     doc_output.seek(0)
@@ -91,46 +101,33 @@ def display_revision_interface(evaluations):
             data['evaluation'] = st.text_area(f"Edit evaluation for '{section}':", value=data['evaluation'], key=eval_key)
             max_points_key = f"max_points_{section}_edit"
             data['max_points'] = st.text_input(f"Max points for '{section}':", value=data['max_points'], key=max_points_key)
-            score_key = f"score_{section}_edit"
-            data['score'] = st.text_input(f"Score for '{section}':", value=data['score'], key=score_key)
 
 def main():
     st.title("Proposal Evaluation App")
     expertise = st.text_input("Enter your field of expertise", value="environmental science")
     num_sections = st.number_input("How many sections does your proposal have?", min_value=1, max_value=10, step=1)
     sections = []
-    total_possible_points = 0
     for i in range(int(num_sections)):
         with st.expander(f"Section {i + 1} Details"):
             section_name = st.text_input(f"Name of section {i + 1}")
             section_points = st.text_input(f"Max points for '{section_name}'", value="5", key=f"max_points_{i}")
             sections.append({'name': section_name, 'points': int(section_points)})
-            total_possible_points += int(section_points)
 
     uploaded_file = st.file_uploader("Upload your proposal PDF", type=["pdf"])
     if uploaded_file is not None:
         proposal_text = read_pdf(uploaded_file)
-        evaluations = evaluate_with_gemini(proposal_text, sections, expertise)
+        evaluations, overall_score = evaluate_with_gemini(proposal_text, sections, expertise)
         st.session_state.evaluations = evaluations  # Initialize or update the session state with evaluations
         display_initial_evaluations(evaluations)
 
         if st.button("Review and Edit Evaluations"):
             display_revision_interface(st.session_state.evaluations)
             if st.button("Save Edited Evaluations"):
-                for section, data in st.session_state.evaluations.items():
-                    data['max_points'] = int(data['max_points'])  # Convert max points to integer
-                    data['score'] = int(data['score'])  # Convert score to integer
-                    # Validate and adjust score if it exceeds max points
-                    if data['score'] > data['max_points']:
-                        data['score'] = data['max_points']
-                    # Validate and adjust max points if it exceeds total possible points
-                    if data['max_points'] > total_possible_points:
-                        data['max_points'] = total_possible_points
                 st.experimental_rerun()  # Rerun the app to reflect the updated evaluations
 
         if st.button("Finalize and Download Report"):
             evaluations = st.session_state.evaluations
-            docx_file = create_docx(evaluations)
+            docx_file = create_docx(evaluations, overall_score)
             st.download_button(
                 label="Download Evaluation Report",
                 data=docx_file,
