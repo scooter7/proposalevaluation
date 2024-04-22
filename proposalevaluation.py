@@ -75,7 +75,7 @@ def display_revision_interface(evaluations):
     for section, data in evaluations.items():
         with st.container():
             data['evaluation'] = st.text_area(f"Edit evaluation for '{section}':", value=data['evaluation'])
-            data['score'] = st.slider(f"Adjust score for '{section}':", 0, data['max_points'], value=int(data['score']))
+            data['score'] = st.text_input(f"Max points for '{section}':", value=data['max_points'])
 
 def main():
     st.title("Proposal Evaluation App")
@@ -85,8 +85,8 @@ def main():
     for i in range(int(num_sections)):
         with st.expander(f"Section {i + 1} Details"):
             section_name = st.text_input(f"Name of section {i + 1}")
-            section_points = st.slider(f"Max points for '{section_name}'", 1, 10, 5)
-            sections.append({'name': section_name, 'points': section_points})
+            section_points = st.text_input(f"Max points for '{section_name}'", value="5")
+            sections.append({'name': section_name, 'points': int(section_points)})
 
     uploaded_file = st.file_uploader("Upload your proposal PDF", type=["pdf"])
     if uploaded_file is not None:
