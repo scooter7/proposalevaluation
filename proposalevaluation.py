@@ -1,7 +1,7 @@
 import streamlit as st
 import fitz  # PyMuPDF
-import pandas as pd
 from fpdf import FPDF
+from io import BytesIO
 import google.generativeai as genai
 
 genai.configure(api_key=st.secrets["google_gen_ai"]["api_key"])
@@ -19,8 +19,15 @@ def evaluate_with_gemini(proposal_text, sections, expertise):
     chat = model.start_chat(history=[])
     responses = {}
     for section in sections:
-        message = f"You are an expert on {expertise}, known for decades of meticulous study, review, and evaluation of {expertise} projects and proposals. Your task involves a comprehensive review of the section '{section['name']}' focused on: \nProse: Assess the clarity and precision of the language used. \nStructure: Review the logical flow and coherence. \nFormat: Evaluate the professional formatting and how it enhances readability. \nProvide detailed commentary and suggestions for improvement based on these aspects."
-        response = chat.send_message(message)
+        prompt = (
+            f"As an expert on {expertise}, evaluate the section '{section['name']}' in the context of {expertise} projects and proposals. "
+            f"Focus your evaluation on:\n"
+            f"- Prose: Clarity and precision of the language.\n"
+            f"- Structure: Logical flow and coherence.\n"
+            f"- Format: Professionalism of the formatting.\n"
+            f"Provide a detailed commentary on these aspects and suggest improvements."
+        )
+        response = chat.send_message(prompt)
         evaluation = response.text.strip()
         responses[section['name']] = {
             'evaluation': evaluation,
@@ -37,11 +44,20 @@ def create_pdf(report_data):
         pdf.cell(200, 10, txt=f"Section: {section}", ln=True)
         pdf.cell(200, 10, txt=f"Evaluation: {data['evaluation']}", ln=True)
         pdf.cell(200, 10, txt=f"Maximum Points: {data['max_points']}", ln=True)
-    pdf.output("evaluation_report.pdf")
+    pdf_output = BytesIO()
+    pdf.output(pdf_output, 'F')
+    pdf_output.seek(0)
+    return pdf_output
+
+def display_revision_interface(evaluations):
+    for section, data in evaluations.items():
+        data['evaluation'] = st.text_area(f"Review and edit the evaluation for '{section}':", data['evaluation'])
+        data['score'] = st.slider(f"Score for '{section}':", 0, data['max_points'], int(data['max_points']/2))
+    return evaluations
 
 def main():
     st.title("Proposal Evaluation App")
-    expertise = st.text_input("Enter your field of expertise", value="technology")
+    expertise = st.text_input("Enter your field of expertise", value="environmental science")
     num_sections = st.number_input("How many sections does your proposal have?", min_value=1, max_value=10, step=1)
     sections = []
     for i in range(int(num_sections)):
@@ -55,16 +71,17 @@ def main():
         proposal_text = read_pdf(uploaded_file)
         if st.button("Evaluate Proposal"):
             evaluations = evaluate_with_gemini(proposal_text, sections, expertise)
-            df_scores = pd.DataFrame([{**{'Section': k}, **v} for k, v in evaluations.items()])
-            st.table(df_scores)
-            if st.button("Download Evaluation Report"):
-                create_pdf(evaluations)
-                with open("evaluation_report.pdf", "rb") as file:
+            if st.button("Review and Edit Evaluations"):
+                evaluations = display_revision_interface(evaluations)
+                if st.button("Finalize and Download Report"):
+                    df_scores = pd.DataFrame([{**{'Section': k}, **v} for k, v in evaluations.items()])
+                    st.table(df_scores)
+                    pdf_file = create_pdf(evaluations)
                     st.download_button(
                         label="Download Evaluation Report",
-                        data=file,
+                        data=pdf_file,
                         file_name="evaluation_report.pdf",
-                        mime="application/octet-stream"
+                        mime="application/pdf"
                     )
 
 if __name__ == "__main__":
