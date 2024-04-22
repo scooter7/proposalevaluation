@@ -74,8 +74,10 @@ def display_initial_evaluations(evaluations):
 def display_revision_interface(evaluations):
     for section, data in evaluations.items():
         with st.container():
-            data['evaluation'] = st.text_area(f"Edit evaluation for '{section}':", value=data['evaluation'])
-            data['score'] = st.text_input(f"Max points for '{section}':", value=data['max_points'])
+            eval_key = f"eval_{section}_edit"
+            data['evaluation'] = st.text_area(f"Edit evaluation for '{section}':", value=data['evaluation'], key=eval_key)
+            max_points_key = f"max_points_{section}_edit"
+            data['max_points'] = st.text_input(f"Max points for '{section}':", value=data['max_points'], key=max_points_key)
 
 def main():
     st.title("Proposal Evaluation App")
@@ -97,14 +99,23 @@ def main():
 
         if st.button("Review and Edit Evaluations"):
             display_revision_interface(st.session_state.evaluations)
-            if st.button("Finalize and Download Report"):
-                pdf_file = create_pdf(st.session_state.evaluations)
-                st.download_button(
-                    label="Download Evaluation Report",
-                    data=pdf_file,
-                    file_name="evaluation_report.pdf",
-                    mime="application/pdf"
-                )
+            if st.button("Save Edited Evaluations"):
+                st.session_state.evaluations = {section: {'evaluation': st.session_state.evaluations[section]['evaluation'], 
+                                                          'score': calculate_score(st.session_state.evaluations[section]['evaluation'], 
+                                                                                   st.session_state.evaluations[section]['max_points']),
+                                                          'max_points': st.session_state.evaluations[section]['max_points']}
+                                                 for section in st.session_state.evaluations}
+                st.experimental_rerun()  # Rerun the app to reflect the updated evaluations
+
+        if st.button("Finalize and Download Report"):
+            evaluations = st.session_state.evaluations
+            pdf_file = create_pdf(evaluations)
+            st.download_button(
+                label="Download Evaluation Report",
+                data=pdf_file,
+                file_name="evaluation_report.pdf",
+                mime="application/pdf"
+            )
 
 if __name__ == "__main__":
     main()
