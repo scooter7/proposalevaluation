@@ -37,22 +37,39 @@ def evaluate_with_gemini(proposal_text, sections, expertise):
     return responses
 
 def calculate_score(evaluation_text, max_points):
-    score_thresholds = {
-        'excellent': 0.9,
-        'good': 0.8,
-        'average': 0.7,
-        'poor': 0.6,
-        'very poor': 0.5
-    }
-    # Check if any of the quality indicators are mentioned in the evaluation text
-    matching_thresholds = [threshold for indicator, threshold in score_thresholds.items() if indicator in evaluation_text.lower()]
-    if matching_thresholds:
-        # Use the highest matching threshold
-        max_threshold = max(matching_thresholds)
-        return int(max_threshold * max_points)  # Assign score based on matching threshold
+    # Evaluate the quality of the evaluation text based on qualitative criteria related to the area of expertise
+    # Adjust the scoring based on the overall quality
+    evaluation_quality = evaluate_quality(evaluation_text)
+    score = 0
+    if evaluation_quality == "excellent":
+        score = int(0.9 * max_points)
+    elif evaluation_quality == "good":
+        score = int(0.8 * max_points)
+    elif evaluation_quality == "average":
+        score = int(0.7 * max_points)
+    elif evaluation_quality == "poor":
+        score = int(0.6 * max_points)
+    elif evaluation_quality == "very poor":
+        score = int(0.5 * max_points)
+    return score
+
+def evaluate_quality(evaluation_text):
+    # Perform a qualitative analysis of the evaluation text based on the defined area of expertise
+    # Determine the overall quality of the evaluation text
+    # This function should be replaced with actual evaluation logic based on the area of expertise
+    # For demonstration purposes, we'll use a placeholder evaluation criterion
+    # You should replace this with the appropriate evaluation criteria based on the area of expertise
+    # Example criteria: relevance, depth of analysis, clarity of explanation, etc.
+    if "relevant" in evaluation_text.lower() and "well-analyzed" in evaluation_text.lower():
+        return "excellent"
+    elif "relevant" in evaluation_text.lower():
+        return "good"
+    elif "clear" in evaluation_text.lower():
+        return "average"
+    elif "unclear" in evaluation_text.lower():
+        return "poor"
     else:
-        # If no quality indicators are found, raise an error as each section must be evaluated
-        raise ValueError("Evaluation does not indicate quality level (excellent, good, average, poor, very poor)")
+        return "very poor"
 
 def create_pdf(report_data):
     pdf = FPDF()
