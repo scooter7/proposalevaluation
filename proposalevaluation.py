@@ -19,20 +19,33 @@ def evaluate_with_gemini(proposal_text, sections, expertise):
     model = genai.GenerativeModel("gemini-pro")
     chat = model.start_chat(history=[])
     responses = {}
+    total_points_possible = sum(section['max_points'] for section in sections)
     for section in sections:
         message = f"As an expert in {expertise}, please evaluate the section '{section['name']}' for its effectiveness, clarity, and accuracy in relation to {expertise} topics: {proposal_text[:2000]}"
         response = chat.send_message(message)
-        responses[section['name']] = response.text.strip()
-    return responses
+        evaluation = response.text.strip()
+        words = len(evaluation.split())
+        score_percentage = min(words / 100, 1)  # Example scoring mechanism based on word count
+        score = min(score_percentage * section['max_points'], section['max_points'])
+        responses[section['name']] = {
+            'evaluation': evaluation,
+            'score': score,
+            'max_points': section['max_points']
+        }
+    return responses, total_points_possible
 
-def create_pdf(report_data):
+def create_pdf(report_data, total_points_possible):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size = 12)
     pdf.cell(200, 10, txt="Proposal Evaluation Report", ln=True, align='C')
-    for section, evaluation in report_data.items():
+    total_score_achieved = 0
+    for section, data in report_data.items():
         pdf.cell(200, 10, txt=f"Section: {section}", ln=True)
-        pdf.cell(200, 10, txt=f"Evaluation: {evaluation}", ln=True)
+        pdf.cell(200, 10, txt=f"Evaluation: {data['evaluation']}", ln=True)
+        pdf.cell(200, 10, txt=f"Score: {data['score']}/{data['max_points']}", ln=True)
+        total_score_achieved += data['score']
+    pdf.cell(200, 10, txt=f"Total Score Achieved: {total_score_achieved} out of {total_points_possible}", ln=True)
     pdf_output = BytesIO()
     pdf.output(pdf_output, 'F')
     pdf_output.seek(0)
@@ -53,20 +66,21 @@ def main():
     for i in range(int(num_sections)):
         with st.expander(f"Section {i + 1} Details"):
             section_name = st.text_input(f"Name of section {i + 1}", key=f"name_{i}")
-            sections.append({'name': section_name})
+            max_points = st.number_input(f"Max points for section {i + 1}", min_value=1, max_value=100, step=1, key=f"max_points_{i}")
+            sections.append({'name': section_name, 'max_points': max_points})
 
     uploaded_file = st.file_uploader("Upload your proposal PDF", type=["pdf"])
     if uploaded_file is not None:
         proposal_text = read_pdf(uploaded_file)
         if st.button("Evaluate Proposal"):
-            evaluations = evaluate_with_gemini(proposal_text, sections, expertise)
+            evaluations, total_points_possible = evaluate_with_gemini(proposal_text, sections, expertise)
             corrections = display_initial_evaluation(evaluations)
             if st.button("Submit Corrections"):
                 final_evaluations = corrections
                 df_scores = pd.DataFrame(list(final_evaluations.items()), columns=['Section', 'Evaluation'])
                 st.table(df_scores)
                 if st.button("Download Evaluation Report"):
-                    pdf_file = create_pdf(final_evaluations)
+                    pdf_file = create_pdf(final_evaluations, total_points_possible)
                     st.download_button(
                         label="Download Evaluation Report",
                         data=pdf_file,
