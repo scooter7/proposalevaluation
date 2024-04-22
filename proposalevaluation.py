@@ -29,10 +29,7 @@ def evaluate_with_gemini(proposal_text, sections, expertise):
         responses[section_name] = {'evaluation': evaluation, 'score': score, 'max_points': section_details['max_points']}
     return responses
 
-def calculate_score(evaluation_text, max_points):
-    # Evaluate the quality of the evaluation text based on qualitative criteria related to the area of expertise
-    # Adjust the scoring based on the overall quality
-    evaluation_quality = evaluate_quality(evaluation_text)
+def calculate_score(evaluation_quality, max_points):
     score = 0
     if evaluation_quality == "excellent":
         score = int(0.9 * max_points)
