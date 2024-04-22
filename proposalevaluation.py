@@ -37,13 +37,12 @@ def evaluate_with_gemini(proposal_text, sections, expertise):
     return responses
 
 def calculate_score(evaluation_text, max_points):
-    # Simplistic qualitative assessment based on key positive indicators
     quality_indicators = ['excellent', 'good', 'adequate', 'poor']
     score_multiplier = {'excellent': 0.9, 'good': 0.75, 'adequate': 0.5, 'poor': 0.25, 'default': 0.1}
     for indicator in quality_indicators:
         if indicator in evaluation_text.lower():
             return max_points * score_multiplier[indicator]
-    return max_points * score_multiplier['default']  # Minimal score if no indicators matched
+    return max_points * score_multiplier['default']
 
 def create_pdf(report_data):
     pdf = FPDF()
@@ -59,6 +58,18 @@ def create_pdf(report_data):
     pdf_output.seek(0)
     return pdf_output
 
+def display_initial_evaluations(evaluations):
+    for section, data in evaluations.items():
+        st.write(f"### {section}")
+        st.text_area("Evaluation", value=data['evaluation'], key=f"eval_{section}_view")
+        st.write("Score:", data['score'], "/", data['max_points'])
+
+def display_revision_interface(evaluations):
+    for section, data in evaluations.items():
+        with st.container():
+            data['evaluation'] = st.text_area(f"Edit evaluation for '{section}':", value=data['evaluation'])
+            data['score'] = st.slider(f"Adjust score for '{section}':", 0, data['max_points'], value=int(data['score']))
+
 def main():
     st.title("Proposal Evaluation App")
     expertise = st.text_input("Enter your field of expertise", value="environmental science")
@@ -73,14 +84,12 @@ def main():
     uploaded_file = st.file_uploader("Upload your proposal PDF", type=["pdf"])
     if uploaded_file is not None:
         proposal_text = read_pdf(uploaded_file)
-        evaluations = st.session_state.get('evaluations') or evaluate_with_gemini(proposal_text, sections, expertise)
-        st.session_state.evaluations = evaluations  # Store evaluations in session state
+        evaluations = evaluate_with_gemini(proposal_text, sections, expertise)
+        st.session_state.evaluations = evaluations  # Initialize or update the session state with evaluations
         display_initial_evaluations(evaluations)
 
         if st.button("Review and Edit Evaluations"):
-            revised_evaluations = display_revision_interface(evaluations)
-            st.session_state.evaluations = revised_evaluations  # Update the state after revisions
-
+            display_revision_interface(st.session_state.evaluations)
             if st.button("Finalize and Download Report"):
                 pdf_file = create_pdf(st.session_state.evaluations)
                 st.download_button(
@@ -89,21 +98,6 @@ def main():
                     file_name="evaluation_report.pdf",
                     mime="application/pdf"
                 )
-
-def display_initial_evaluations(evaluations):
-    for section, data in evaluations.items():
-        st.write(f"### {section}")
-        st.text_area("Evaluation", value=data['evaluation'], key=f"eval_{section}_view")
-        st.write("Score:", data['score'], "/", data['max_points'])
-
-def display_revision_interface(evaluations):
-    revised_evaluations = {}
-    for section, data in evaluations.items():
-        with st.container():
-            evaluation_edit = st.text_area(f"Edit evaluation for '{section}':", value=data['evaluation'], key=f"eval_{section}_edit")
-            score_edit = st.slider(f"Adjust score for '{section}':", 0, data['max_points'], value=int(data['score']), key=f"score_{section}_edit")
-            revised_evaluations[section] = {'evaluation': evaluation_edit, 'score': score_edit, 'max_points': data['max_points']}
-    return revised_evaluations
 
 if __name__ == "__main__":
     main()
