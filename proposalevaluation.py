@@ -29,8 +29,9 @@ def evaluate_with_gemini(proposal_text, sections, expertise):
         )
         response = chat.send_message(prompt)
         evaluation = response.text.strip()
-        # Initial score calculation - placeholders for now, replace with actual logic as required
-        score = min(len(evaluation.split()) / 10, section['points'])  # A simple proxy for scoring
+        relevance = len(evaluation.split())  # Simplistic approach to gauge content relevance
+        score = relevance / (10 * len(section['name']))  # Adjusted for discernment based on section length
+        score = min(score * 100, section['points'])  # Scale score to max points
         responses[section['name']] = {
             'evaluation': evaluation,
             'score': score,
@@ -41,7 +42,7 @@ def evaluate_with_gemini(proposal_text, sections, expertise):
 def create_pdf(report_data):
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("Arial", size = 12)
+    pdf.set_font("Arial", size=12)
     pdf.cell(200, 10, txt="Proposal Evaluation Report", ln=True, align='C')
     for section, data in report_data.items():
         pdf.cell(200, 10, txt=f"Section: {section}", ln=True)
@@ -53,10 +54,13 @@ def create_pdf(report_data):
     return pdf_output
 
 def display_revision_interface(evaluations):
+    revised_evaluations = {}
     for section, data in evaluations.items():
-        data['evaluation'] = st.text_area(f"Review and edit the evaluation for '{section}':", data['evaluation'])
-        data['score'] = st.slider(f"Adjust the score for '{section}':", 0, data['max_points'], int(data['score']))
-    return evaluations
+        with st.container():
+            revised_eval = st.text_area(f"Edit evaluation for '{section}':", data['evaluation'], key=f"edit_{section}")
+            revised_score = st.slider(f"Adjust score for '{section}':", 0, data['max_points'], int(data['score']), key=f"score_{section}")
+            revised_evaluations[section] = {'evaluation': revised_eval, 'score': revised_score, 'max_points': data['max_points']}
+    return revised_evaluations
 
 def main():
     st.title("Proposal Evaluation App")
@@ -65,8 +69,8 @@ def main():
     sections = []
     for i in range(int(num_sections)):
         with st.expander(f"Section {i + 1} Details"):
-            section_name = st.text_input(f"Name of section {i + 1}", key=f"name_{i}")
-            section_points = st.number_input(f"Maximum Points for section {i + 1}", min_value=1, max_value=100, step=1, key=f"points_{i}")
+            section_name = st.text_input(f"Name of section {i + 1}")
+            section_points = st.number_input(f"Maximum Points for section {i + 1}", min_value=1, max_value=100)
             sections.append({'name': section_name, 'points': section_points})
 
     uploaded_file = st.file_uploader("Upload your proposal PDF", type=["pdf"])
@@ -74,14 +78,11 @@ def main():
         proposal_text = read_pdf(uploaded_file)
         if st.button("Evaluate Proposal"):
             evaluations = evaluate_with_gemini(proposal_text, sections, expertise)
-            st.write("Initial Evaluations:")
-            for section, data in evaluations.items():
-                st.write(f"### {section}")
-                st.text_area("Evaluation", value=data['evaluation'], key=f"eval_{section}")
-                st.write("Score:", data['score'], "/", data['max_points'])
             if st.button("Review and Edit Evaluations"):
                 evaluations = display_revision_interface(evaluations)
                 if st.button("Finalize and Download Report"):
+                    df_scores = pd.DataFrame([{**{'Section': k}, **v} for k, v in evaluations.items()])
+                    st.table(df_scores)
                     pdf_file = create_pdf(evaluations)
                     st.download_button(
                         label="Download Evaluation Report",
