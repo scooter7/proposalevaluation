@@ -48,7 +48,6 @@ def create_pdf(report_data):
 def main():
     st.title("Proposal Evaluation App")
     expertise = st.text_input("Enter your field of expertise", value="technology")
-    st.write(f"You're an expert in {expertise}, known for two decades of meticulous study, review, and evaluation of {expertise} projects and proposals.")
     num_sections = st.number_input("How many sections does your proposal have?", min_value=1, max_value=10, step=1)
     sections = []
     for i in range(int(num_sections)):
