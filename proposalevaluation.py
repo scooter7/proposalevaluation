@@ -1,7 +1,7 @@
 import streamlit as st
 import fitz  # PyMuPDF
-from fpdf import FPDF
 from io import BytesIO
+from docx import Document
 import google.generativeai as genai
 
 genai.configure(api_key=st.secrets["google_gen_ai"]["api_key"])
@@ -15,21 +15,31 @@ def read_pdf(uploaded_file):
     return text
 
 def evaluate_with_gemini(proposal_text, sections, expertise):
+    model = genai.GenerativeModel("gemini-pro")
+    chat = model.start_chat(history=[])
     responses = {}
-    for section_name, section_details in sections.items():
+    for section in sections:
         prompt = (
-            f"As an expert on {expertise}, evaluate the section '{section_name}'. "
+            f"As an expert on {expertise}, evaluate the section '{section['name']}' in the context of {expertise} projects and proposals. "
             f"Focus your evaluation on:\n"
-            "- Prose: Assess the clarity and precision of the language.\n"
-            "- Structure: Review the logical flow and coherence.\n"
-            "- Format: Evaluate the professional formatting of the document."
+            f"- Prose: Assess the clarity and precision of the language.\n"
+            f"- Structure: Review the logical flow and coherence.\n"
+            f"- Format: Evaluate how the formatting enhances readability.\n"
+            f"Provide detailed commentary and suggestions for improvement."
         )
-        evaluation = st.text_area(prompt)
-        score = calculate_score(evaluation, section_details['max_points'])
-        responses[section_name] = {'evaluation': evaluation, 'score': score, 'max_points': section_details['max_points']}
+        response = chat.send_message(prompt)
+        evaluation = response.text.strip()
+        responses[section['name']] = {
+            'evaluation': evaluation,
+            'score': calculate_score(evaluation, section['points']),
+            'max_points': section['points']
+        }
     return responses
 
-def calculate_score(evaluation_quality, max_points):
+def calculate_score(evaluation_text, max_points):
+    # Evaluate the quality of the evaluation text based on qualitative criteria related to the area of expertise
+    # Adjust the scoring based on the overall quality
+    evaluation_quality = evaluate_quality(evaluation_text)
     score = 0
     if evaluation_quality == "excellent":
         score = int(0.9 * max_points)
@@ -47,8 +57,6 @@ def evaluate_quality(evaluation_text):
     # Perform a qualitative analysis of the evaluation text based on the defined area of expertise
     # Determine the overall quality of the evaluation text
     # This function should be replaced with actual evaluation logic based on the area of expertise
-    # For demonstration purposes, we'll use a placeholder evaluation criterion
-    # You should replace this with the appropriate evaluation criteria based on the area of expertise
     # Example criteria: relevance, depth of analysis, clarity of explanation, etc.
     if "relevant" in evaluation_text.lower() and "well-analyzed" in evaluation_text.lower():
         return "excellent"
@@ -61,21 +69,17 @@ def evaluate_quality(evaluation_text):
     else:
         return "very poor"
 
-def create_pdf(report_data):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=12)
-    pdf.cell(200, 10, txt="Proposal Evaluation Report", ln=True, align='C')
-
+def create_docx(report_data):
+    doc = Document()
+    doc.add_heading("Proposal Evaluation Report", level=1)
     for section, data in report_data.items():
-        pdf.cell(200, 10, txt=f"Section: {section}", ln=True)
-        pdf.cell(200, 10, txt=f"Evaluation: {data['evaluation']}", ln=True)
-        pdf.cell(200, 10, txt=f"Score: {data['score']}/{data['max_points']}", ln=True)
-
-    pdf_output = BytesIO()
-    pdf.output(pdf_output)
-    pdf_output.seek(0)
-    return pdf_output
+        doc.add_heading(f"Section: {section}", level=2)
+        doc.add_paragraph(f"Evaluation: {data['evaluation']}")
+        doc.add_paragraph(f"Score: {data['score']}/{data['max_points']}")
+    doc_output = BytesIO()
+    doc.save(doc_output)
+    doc_output.seek(0)
+    return doc_output
 
 def display_initial_evaluations(evaluations):
     for section, data in evaluations.items():
@@ -90,49 +94,45 @@ def display_revision_interface(evaluations):
             data['evaluation'] = st.text_area(f"Edit evaluation for '{section}':", value=data['evaluation'], key=eval_key)
             max_points_key = f"max_points_{section}_edit"
             data['max_points'] = st.text_input(f"Max points for '{section}':", value=data['max_points'], key=max_points_key)
+            score_key = f"score_{section}_edit"
+            data['score'] = st.text_input(f"Score for '{section}':", value=data['score'], key=score_key)
 
 def main():
     st.title("Proposal Evaluation App")
-    expertise = st.text_input("Enter your field of expertise", value="")
-
-    st.write(f"You're an {expertise} expert, known for decades of meticulous study, review, and evaluation of projects and proposals.")
+    expertise = st.text_input("Enter your field of expertise", value="environmental science")
     num_sections = st.number_input("How many sections does your proposal have?", min_value=1, max_value=10, step=1)
-    sections = {}
-
+    sections = []
     for i in range(int(num_sections)):
-        section_name = st.text_input(f"Name of section {i + 1}")
-        max_points = st.text_input(f"Max points for '{section_name}'", key=f"max_points_{i}")
-        sections[section_name] = {'max_points': max_points}
+        with st.expander(f"Section {i + 1} Details"):
+            section_name = st.text_input(f"Name of section {i + 1}")
+            section_points = st.text_input(f"Max points for '{section_name}'", value="5", key=f"max_points_{i}")
+            sections.append({'name': section_name, 'points': int(section_points)})
 
     uploaded_file = st.file_uploader("Upload your proposal PDF", type=["pdf"])
     if uploaded_file is not None:
         proposal_text = read_pdf(uploaded_file)
-        if st.button("Evaluate Proposal"):
-            evaluations = evaluate_with_gemini(proposal_text, sections, expertise)  # Pass expertise argument
-            st.session_state.evaluations = evaluations  # Save evaluations in session state
-            display_initial_evaluations(evaluations)
+        evaluations = evaluate_with_gemini(proposal_text, sections, expertise)
+        st.session_state.evaluations = evaluations  # Initialize or update the session state with evaluations
+        display_initial_evaluations(evaluations)
 
-    if "evaluations" in st.session_state:
         if st.button("Review and Edit Evaluations"):
             display_revision_interface(st.session_state.evaluations)
             if st.button("Save Edited Evaluations"):
-                st.session_state.evaluations = {}  # Clear previous evaluations
-                # Retrieve edited evaluations and update session state
-                for i, section_name in enumerate(sections.keys()):
-                    evaluation = st.text_area(f"Edit evaluation for '{section_name}'", value="")
-                    max_points_key = f"max_points_{i}"
-                    max_points = st.text_input(f"Max points for '{section_name}'", key=max_points_key)
-                    st.session_state.evaluations[section_name] = {'evaluation': evaluation, 'max_points': max_points}
-                st.experimental_rerun()  # Rerun the app to reflect the changes
+                st.session_state.evaluations = {section: {'evaluation': st.session_state.evaluations[section]['evaluation'], 
+                                                          'score': int(st.session_state.evaluations[section]['score']),
+                                                          'max_points': int(st.session_state.evaluations[section]['max_points'])}
+                                                 for section in st.session_state.evaluations}
+                st.experimental_rerun()  # Rerun the app to reflect the updated evaluations
 
-    if st.button("Finalize and Download Report"):
-        pdf_file = create_pdf(st.session_state.evaluations)
-        st.download_button(
-            label="Download Evaluation Report",
-            data=pdf_file.getvalue(),
-            file_name="evaluation_report.pdf",
-            mime="application/pdf"
-        )
+        if st.button("Finalize and Download Report"):
+            evaluations = st.session_state.evaluations
+            docx_file = create_docx(evaluations)
+            st.download_button(
+                label="Download Evaluation Report",
+                data=docx_file,
+                file_name="evaluation_report.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
 
 if __name__ == "__main__":
     main()
