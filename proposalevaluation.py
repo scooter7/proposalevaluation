@@ -21,7 +21,21 @@ def evaluate_with_gemini(proposal_text, sections, expertise):
     total_max_points = 0
     total_awarded_points = 0
     for section in sections:
-        prompt = ...
+        prompt = f"""
+        You're an expert in {expertise}, known for two decades of meticulous study, review, and evaluation of {expertise} projects and proposals.
+
+        You will be given a proposal submission to consider. Your task will involve a comprehensive review of it based on your subject matter expertise, and the project's defined sections.
+
+        In your evaluation, you will provide an overall score supported by detailed commentary on each section. Additionally, you will write a report offering feedback to the Respondent and suggestions for improving the submission. Areas to focus on include:
+
+        Prose: Assess the clarity and precision of the language used in each section. Evaluate how effectively the language facilitates comprehension of the offerings and methodologies.
+
+        Structure: Review the logical flow and coherence of the sections. Ensure that the points are presented in a well-organized manner that aligns with procurement evaluation protocols.
+
+        Format: Evaluate the professional formatting of the documents. Consider how the formatting enhances readability, making it easier for procurement teams to locate critical information.
+
+        Value: Whenever prices or fees are presented, please assess the extent to which the dollar values seem to be a good value in terms of the services offered.
+        """
         response = chat.send_message(prompt)
         evaluation = response.text.strip()
         max_points = int(section['points'])
