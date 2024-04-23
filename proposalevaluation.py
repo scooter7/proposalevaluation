@@ -82,7 +82,7 @@ def create_docx(report_data, overall_score):
     for section, data in report_data.items():
         doc.add_heading(f"Section: {section}", level=2)
         doc.add_paragraph(f"Evaluation: {data['evaluation']}")
-        doc.add_paragraph(f"Score: {data['score']}/{data['max_points']}")
+        # Removed the line that formats score as "Score: x / y"
     doc.add_heading("Overall Score", level=2)
     doc.add_paragraph(f"Overall Score: {overall_score:.1%}")
     doc_output = BytesIO()
@@ -94,7 +94,7 @@ def display_initial_evaluations(evaluations):
     for section, data in evaluations.items():
         st.write(f"### {section}")
         st.text_area(f"Evaluation for '{section}'", value=data['evaluation'], key=f"eval_{section}_view")
-        st.write("Score:", data['score'], "/", data['max_points'])
+        # Removed the line displaying score as "Score: x / y"
 
 def display_revision_interface(evaluations):
     for section, data in evaluations.items():
