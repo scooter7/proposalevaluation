@@ -21,54 +21,45 @@ def evaluate_with_gemini(proposal_text, sections, expertise):
     total_max_points = 0
     total_awarded_points = 0
     for section in sections:
-        prompt = f"""
-        You're an expert in {expertise}, known for two decades of meticulous study, review, and evaluation of {expertise} projects and proposals.
-
-        You will be given a proposal submission to consider. Your task will involve a comprehensive review of it based on your subject matter expertise, and the project's defined sections.
-
-        In your evaluation, you will provide an overall score supported by detailed commentary on each section. Additionally, you will write a report offering feedback to the Respondent and suggestions for improving the submission. Areas to focus on include:
-
-        Prose: Assess the clarity and precision of the language used in each section. Evaluate how effectively the language facilitates comprehension of the offerings and methodologies.
-
-        Structure: Review the logical flow and coherence of the sections. Ensure that the points are presented in a well-organized manner that aligns with procurement evaluation protocols.
-
-        Format: Evaluate the professional formatting of the documents. Consider how the formatting enhances readability, making it easier for procurement teams to locate critical information.
-
-        Value: Whenever prices or fees are presented, please assess the extent to which the dollar values seem to be a good value in terms of the services offered.
-        """
+        prompt = (
+            f"You're an expert in {expertise}, known for two decades of meticulous study, review, and evaluation of {expertise} projects and proposals."
+            f"You will be given a proposal submission to consider. Your task will involve a comprehensive review of it based on your subject matter expertise, and the project's defined sections."
+            f"In your evaluation, you will provide an overall score supported by detailed commentary on each section. Additionally, you will write a report offering feedback to the Respondent and suggestions for improving the submission. Areas to focus on include:"
+            f"Prose: Assess the clarity and precision of the language used in each section. Evaluate how effectively the language facilitates comprehension of the offerings and methodologies."
+            f"Structure: Review the logical flow and coherence of the sections. Ensure that the points are presented in a well-organized manner that aligns with procurement evaluation protocols."
+            f"Format: Evaluate the professional formatting of the documents. Consider how the formatting enhances readability, making it easier for procurement teams to locate critical information."
+            f"Value: Whenever prices or fees are presented, please assess the extent to which the dollar values seem to be a good value in terms of the services offered."
+        )
         response = chat.send_message(prompt)
         evaluation = response.text.strip()
         max_points = int(section['points'])
         total_max_points += max_points
-        score = calculate_score(evaluation, max_points)
-        awarded_points = score / max_points * 100  # Calculate awarded percentage
+        score, score_percentage = calculate_score(evaluation, max_points)
         responses[section['name']] = {
             'evaluation': evaluation,
-            'awarded_percentage': awarded_points,  # Store as percentage
+            'score': score,
+            'awarded_percentage': score_percentage,
             'max_points': max_points
         }
-        total_awarded_points += score * max_points / 100  # Convert percentage back for total calculation
+        total_awarded_points += score
     
     overall_score = total_awarded_points / total_max_points if total_max_points > 0 else 0
+    overall_score_percentage = (total_awarded_points / total_max_points * 100) if total_max_points > 0 else 0
     
-    return responses, overall_score
+    return responses, overall_score, overall_score_percentage
 
 def calculate_score(evaluation_text, max_points):
-    max_points = int(max_points)
     evaluation_quality = evaluate_quality(evaluation_text)
-    if evaluation_quality == "excellent":
-        score = int(0.9 * max_points)
-    elif evaluation_quality == "good":
-        score = int(0.8 * max_points)
-    elif evaluation_quality == "average":
-        score = int(0.7 * max_points)
-    elif evaluation_quality == "poor":
-        score = int(0.6 * max_points)
-    elif evaluation_quality == "very poor":
-        score = int(0.5 * max_points)
-    else:
-        score = 0
-    return score
+    quality_scores = {
+        "excellent": 0.9,
+        "good": 0.8,
+        "average": 0.7,
+        "poor": 0.6,
+        "very poor": 0.5
+    }
+    score_percentage = quality_scores.get(evaluation_quality, 0)
+    score = score_percentage * max_points
+    return score, score_percentage * 100
 
 def evaluate_quality(evaluation_text):
     if "relevant" in evaluation_text.lower() and "well-analyzed" in evaluation_text.lower():
@@ -82,15 +73,15 @@ def evaluate_quality(evaluation_text):
     else:
         return "very poor"
 
-def create_docx(report_data, overall_score):
+def create_docx(report_data, overall_score, overall_score_percentage):
     doc = Document()
     doc.add_heading("Proposal Evaluation Report", level=1)
     for section, data in report_data.items():
         doc.add_heading(f"Section: {section}", level=2)
         doc.add_paragraph(f"Evaluation: {data['evaluation']}")
-        doc.add_paragraph(f"Score: {data['awarded_percentage']:.1f}% ({data['max_points']} points maximum)")
+        doc.add_paragraph(f"Score: {data['score']} out of {data['max_points']} ({data['awarded_percentage']:.1f}%)")
     doc.add_heading("Overall Score", level=2)
-    doc.add_paragraph(f"Overall Score: {overall_score:.1%}")
+    doc.add_paragraph(f"Overall Score: {overall_score:.1f} ({overall_score_percentage:.1f}%)")
     doc_output = BytesIO()
     doc.save(doc_output)
     doc_output.seek(0)
@@ -100,15 +91,7 @@ def display_initial_evaluations(evaluations):
     for section, data in evaluations.items():
         st.write(f"### {section}")
         st.text_area(f"Evaluation for '{section}'", value=data['evaluation'], key=f"eval_{section}_view")
-        st.write("Score:", f"{data['awarded_percentage']:.1f}%", f"({data['max_points']} points maximum)")
-
-def display_revision_interface(evaluations):
-    for section, data in evaluations.items():
-        with st.container():
-            eval_key = f"eval_{section}_edit"
-            data['evaluation'] = st.text_area(f"Edit evaluation for '{section}':", value=data['evaluation'], key=eval_key)
-            max_points_key = f"max_points_{section}_edit"
-            data['max_points'] = st.text_input(f"Max points for '{section}':", value=data['max_points'], key=max_points_key)
+        st.write("Score:", f"{data['score']} out of {data['max_points']} ({data['awarded_percentage']:.1f}%)")
 
 def main():
     st.title("Proposal Evaluation App")
@@ -124,7 +107,7 @@ def main():
     uploaded_file = st.file_uploader("Upload your proposal PDF", type=["pdf"])
     if uploaded_file is not None:
         proposal_text = read_pdf(uploaded_file)
-        evaluations, overall_score = evaluate_with_gemini(proposal_text, sections, expertise)
+        evaluations, overall_score, overall_score_percentage = evaluate_with_gemini(proposal_text, sections, expertise)
         st.session_state.evaluations = evaluations  # Initialize or update the session state with evaluations
         display_initial_evaluations(evaluations)
 
@@ -135,7 +118,7 @@ def main():
 
         if st.button("Finalize and Download Report"):
             evaluations = st.session_state.evaluations
-            docx_file = create_docx(evaluations, overall_score)
+            docx_file = create_docx(evaluations, overall_score, overall_score_percentage)
             st.download_button(
                 label="Download Evaluation Report",
                 data=docx_file,
