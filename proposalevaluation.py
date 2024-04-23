@@ -18,31 +18,23 @@ def evaluate_with_gemini(proposal_text, sections, expertise):
     model = genai.GenerativeModel("gemini-pro")
     chat = model.start_chat(history=[])
     responses = {}
-    total_max_points = 0  # Track total maximum points
-    total_awarded_points = 0  # Track total awarded points
+    total_max_points = 0
+    total_awarded_points = 0
     for section in sections:
-        prompt = (
-            f"You're an expert in {expertise}, known for two decades of meticulous study, review, and evaluation of {expertise} projects and proposals.\n\n"
-            f"You will be given a proposal submission to consider. Your task will involve a comprehensive review of it based on your subject matter expertise, and the project's defined sections.\n\n"
-            f"In your evaluation, you will provide an overall score supported by detailed commentary on each section. Additionally, you will write a report offering feedback to the Respondent and suggestions for improving the submission. Areas to focus on include:\n\n"
-            f"Prose: Assess the clarity and precision of the language used in each section. Evaluate how effectively the language facilitates comprehension of the offerings and methodologies.\n\n"
-            f"Structure: Review the logical flow and coherence of the sections. Ensure that the points are presented in a well-organized manner that aligns with procurement evaluation protocols.\n\n"
-            f"Format: Evaluate the professional formatting of the documents. Consider how the formatting enhances readability, making it easier for procurement teams to locate critical information.\n\n"
-            f"Value: Whenever prices or fees are presented, please assess the extent to which the dollar values seem to be a good value in terms of the services offered."
-        )
+        prompt = ...
         response = chat.send_message(prompt)
         evaluation = response.text.strip()
         max_points = int(section['points'])
         total_max_points += max_points
         score = calculate_score(evaluation, max_points)
+        awarded_points = score / max_points * 100  # Calculate awarded percentage
         responses[section['name']] = {
             'evaluation': evaluation,
-            'score': score,
+            'awarded_percentage': awarded_points,  # Store as percentage
             'max_points': max_points
         }
-        total_awarded_points += score
+        total_awarded_points += score * max_points / 100  # Convert percentage back for total calculation
     
-    # Calculate overall score
     overall_score = total_awarded_points / total_max_points if total_max_points > 0 else 0
     
     return responses, overall_score
@@ -82,7 +74,7 @@ def create_docx(report_data, overall_score):
     for section, data in report_data.items():
         doc.add_heading(f"Section: {section}", level=2)
         doc.add_paragraph(f"Evaluation: {data['evaluation']}")
-        # Removed the line that formats score as "Score: x / y"
+        doc.add_paragraph(f"Score: {data['awarded_percentage']:.1f}% ({data['max_points']} points maximum)")
     doc.add_heading("Overall Score", level=2)
     doc.add_paragraph(f"Overall Score: {overall_score:.1%}")
     doc_output = BytesIO()
@@ -94,7 +86,7 @@ def display_initial_evaluations(evaluations):
     for section, data in evaluations.items():
         st.write(f"### {section}")
         st.text_area(f"Evaluation for '{section}'", value=data['evaluation'], key=f"eval_{section}_view")
-        # Removed the line displaying score as "Score: x / y"
+        st.write("Score:", f"{data['awarded_percentage']:.1f}%", f"({data['max_points']} points maximum)")
 
 def display_revision_interface(evaluations):
     for section, data in evaluations.items():
