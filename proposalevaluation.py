@@ -93,6 +93,16 @@ def display_initial_evaluations(evaluations):
         st.text_area(f"Evaluation for '{section}'", value=data['evaluation'], key=f"eval_{section}_view")
         st.write("Score:", f"{data['score']} out of {data['max_points']} ({data['awarded_percentage']:.1f}%)")
 
+def display_revision_interface(evaluations):
+    for section, data in evaluations.items():
+        with st.container():
+            eval_key = f"eval_{section}_edit"
+            data['evaluation'] = st.text_area(f"Edit evaluation for '{section}':", value=data['evaluation'], key=eval_key)
+            score_key = f"score_{section}_edit"
+            data['score'] = st.text_input(f"Edit score for '{section}':", value=str(data['score']), key=score_key)
+            max_points_key = f"max_points_{section}_edit"
+            data['max_points'] = st.text_input(f"Edit max points for '{section}':", value=str(data['max_points']), key=max_points_key)
+
 def main():
     st.title("Proposal Evaluation App")
     expertise = st.text_input("Enter your field of expertise", value="environmental science")
@@ -108,13 +118,18 @@ def main():
     if uploaded_file is not None:
         proposal_text = read_pdf(uploaded_file)
         evaluations, overall_score, overall_score_percentage = evaluate_with_gemini(proposal_text, sections, expertise)
-        st.session_state.evaluations = evaluations  # Initialize or update the session state with evaluations
+        st.session_state.evaluations = evaluations
         display_initial_evaluations(evaluations)
 
         if st.button("Review and Edit Evaluations"):
             display_revision_interface(st.session_state.evaluations)
             if st.button("Save Edited Evaluations"):
-                st.experimental_rerun()  # Rerun the app to reflect the updated evaluations
+                for section, data in st.session_state.evaluations.items():
+                    evaluations[section]['evaluation'] = st.session_state[f'eval_{section}_edit']
+                    evaluations[section]['score'] = float(st.session_state[f'score_{section}_edit'])
+                    evaluations[section]['max_points'] = int(st.session_state[f'max_points_{section}_edit'])
+                st.session_state.evaluations = evaluations
+                st.experimental_rerun()
 
         if st.button("Finalize and Download Report"):
             evaluations = st.session_state.evaluations
